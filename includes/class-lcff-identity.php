@@ -225,36 +225,21 @@ class LCFF_Identity {
 	}
 
 	/**
-	 * Trims, strips a leading '#' and validates the order number.
-	 *
-	 * @param string $raw Raw input.
-	 * @return string|null Null when not acceptable.
-	 */
-	public static function normalize_number( $raw ) {
-		$n = trim( (string) $raw );
-		if ( 0 === strpos( $n, '#' ) ) {
-			$n = substr( $n, 1 );
-		}
-		return 1 === preg_match( '#^[A-Za-z0-9/_-]{1,32}$#', $n ) ? $n : null;
-	}
-
-	/**
-	 * The number to look up: the input itself when it is a well-formed order
-	 * number (normalize_number()), else its first run of 3 or more digits
-	 * ("Order 12345", "Nr. 12345."), else none.
+	 * The number to look up: the input itself, trimmed and without a leading
+	 * '#', when it is an order number as a whole; else none. A number is
+	 * never picked out of free text: "Bestellung vom 03.11.2024" or a phone
+	 * number could find a stranger's order and link this chat to them. Such
+	 * answers reach the agent as typed ("not found"), who links by hand.
 	 *
 	 * @param string $raw Raw input, unslashed.
 	 * @return string|null
 	 */
 	public static function lookup_number( $raw ) {
-		$number = self::normalize_number( $raw );
-		if ( null !== $number ) {
-			return $number;
+		$n = trim( (string) $raw );
+		if ( 0 === strpos( $n, '#' ) ) {
+			$n = substr( $n, 1 );
 		}
-		if ( 1 === preg_match( '/\d{3,}/', (string) $raw, $m ) && strlen( $m[0] ) <= 32 ) {
-			return $m[0];
-		}
-		return null;
+		return 1 === preg_match( '#^[A-Za-z0-9/_-]{1,32}$#', $n ) ? $n : null;
 	}
 
 	/**
