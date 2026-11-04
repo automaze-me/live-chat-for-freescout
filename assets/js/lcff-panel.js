@@ -238,6 +238,8 @@
 
 	/* ---- sending ---- */
 	function submit() {
+		// The composer is disabled while the list is held (see holdList()).
+		if (held) { return; }
 		var text = el.input.value.trim();
 		if (!text) { return; }
 		if (text.length > 5000) { text = text.slice(0, 5000); }
@@ -301,6 +303,25 @@
 		});
 	}
 
+	/*
+	 * Sends one job. Never while the list is held for the panel-open check:
+	 * the token may belong to the account that check is about to forget.
+	 * A job waits for the release and is prepared afterwards, so it uses the
+	 * token (or pending token) of whoever is in front of the screen.
+	 */
+	function dispatch(job) {
+		return whenReleased().then(function () {
+			return prepareSend(job);
+		}).then(function (p) {
+			// The widget forgot everything meanwhile: the job is dropped.
+			if (job.gen !== gen) { throw new Error('lcff: forgotten'); }
+			// Held again while the login token was fetched: wait and prepare afresh.
+			if (held) { return dispatch(job); }
+			job.acct = p.acct;
+			return request('POST', '/messages', p.body, p.token);
+		});
+	}
+
 	function pump() {
 		if (inFlight || !queue.length) { return; }
 		inFlight = true;
@@ -317,12 +338,7 @@
 		};
 		var sent;
 		try {
-			sent = prepareSend(job).then(function (p) {
-				// The widget forgot everything while the login token was fetched.
-				if (job.gen !== gen) { throw new Error('lcff: forgotten'); }
-				job.acct = p.acct;
-				return request('POST', '/messages', p.body, p.token);
-			});
+			sent = dispatch(job);
 		} catch (e) {
 			sent = Promise.reject(e);
 		}
@@ -672,6 +688,7 @@
 		initialDone = false;
 		if (unread) { setUnread(0); }
 		if (!built) { return; }
+		el.input.value = ''; // a draft belongs to whoever typed it
 		var kids = Array.prototype.slice.call(el.list.childNodes);
 		for (var i = 0; i < kids.length; i++) {
 			if (kids[i] !== el.welcome) { el.list.removeChild(kids[i]); }
@@ -724,6 +741,8 @@
 		if (!started) { startPolling(); } else if (!polling) { schedule(0); }
 	}
 
+	var releaseWaiters = []; // dispatches waiting for releaseList()
+
 	/*
 	 * While this browser holds an account login (lcff_acct), open() hides the
 	 * message list until the panel-open check settles: the person in front
@@ -735,6 +754,9 @@
 		held = true;
 		el.list.style.visibility = 'hidden';
 		el.list.setAttribute('aria-busy', 'true');
+		// Nothing can be typed, queued or sent until the check settles.
+		el.input.readOnly = true;
+		el.send.disabled = true;
 	}
 
 	function releaseList() {
@@ -742,7 +764,19 @@
 		held = false;
 		el.list.style.visibility = '';
 		el.list.removeAttribute('aria-busy');
+		el.input.readOnly = false;
+		el.send.disabled = false;
+		var waiters = releaseWaiters;
+		releaseWaiters = [];
+		for (var i = 0; i < waiters.length; i++) { waiters[i](); }
 		if (active()) { markSeen(); }
+		if (isOpen) { el.input.focus(); }
+	}
+
+	/* Resolves once the list is not held (at once when it isn't). */
+	function whenReleased() {
+		if (!held) { return Promise.resolve(); }
+		return new Promise(function (resolve) { releaseWaiters.push(resolve); });
 	}
 
 	/*
@@ -857,7 +891,7 @@
 		if (getToken() && !started) { startPolling(); } else if (started) { schedule(0); }
 		checkIdentity();
 		scrollDown();
-		el.input.focus();
+		if (!held) { el.input.focus(); } // else releaseList() focuses it
 	}
 
 	function close() {

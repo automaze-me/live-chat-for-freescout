@@ -218,6 +218,11 @@
 	cursor: pointer;
 }
 
+.lcff-send:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
 .lcff-bubble:focus-visible,
 .lcff-send:focus-visible,
 .lcff-close:focus-visible,
