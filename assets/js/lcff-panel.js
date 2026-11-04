@@ -12,6 +12,8 @@
 	var POLL_SLOW = 30000;
 	var POLL_MAX = 600000;       // backoff ceiling: 10 min
 	var REQUEST_TIMEOUT = 20000; // every request is aborted after 20 s
+	var RECHECK_EVERY = 1800000; // identity re-check while the panel is open: 30 min
+	var LOGIN_FRESH = 3600000;   // a send with a token fetches a login token once the last one is older: 60 min
 
 	/* ---- storage with in-memory fallback ---- */
 	var mem = {};
@@ -66,6 +68,9 @@
 	var checking = false;      // a panel-open identity check is running
 	var held = false;          // the message list is hidden until that check settles
 	var gen = 0;               // bumped by forget(); answers to older requests are dropped
+	var lastLoginAt = 0;       // Date.now() when FreeScout last accepted a login token; 0: not yet
+	var rechecking = false;    // a re-check (see recheckIdentity()) is running
+	var recheckTimer = null;
 	var askCard = null;        // the email / order-number card on screen, if any
 	var askSeq = 0;
 	var noticeEl = null;       // the one .lcff-notice at the end of the list, if any
@@ -317,21 +322,46 @@
 	 * tokenless send carries the pending token as `new_token`; when WordPress
 	 * last said "logged in", it also carries a fresh login token bound to it
 	 * (each one is single-use), so the conversation starts as an account
-	 * conversation (Ruling P7), and `acct` is that account's marker. Never
-	 * rejects.
+	 * conversation (Ruling P7), and `acct` is that account's marker. A send
+	 * with a token carries one too once the last login FreeScout accepted is
+	 * LOGIN_FRESH old, so a long chat keeps its account (FreeScout lets an
+	 * account login lapse after 2 h). Never rejects.
 	 */
 	function prepareSend(job) {
 		var body = { text: job.text, client_message_id: job.clientId };
 		var token = getToken();
-		if (token) { return Promise.resolve({ body: body, token: token, acct: null }); }
-		if (!pendingToken) { pendingToken = newToken(); }
-		var chat = pendingToken;
-		body.new_token = chat;
-		var plain = { body: body, token: null, acct: null };
-		if (!loggedIn || !identityOn()) { return Promise.resolve(plain); }
+		var chat = token;
+		if (!token) {
+			if (!pendingToken) { pendingToken = newToken(); }
+			chat = pendingToken;
+			body.new_token = chat;
+		}
+		var plain = { body: body, token: token || null, acct: null };
+		if (!loggedIn || !identityOn() || (token && Date.now() - lastLoginAt <= LOGIN_FRESH)) {
+			return Promise.resolve(plain);
+		}
+		var myGen = gen;
 		return wpIdentity(chat).then(function (who) {
-			if (who) { loggedIn = who.logged_in; }
-			if (who && who.logged_in) {
+			if (!who || myGen !== gen) { return plain; }
+			loggedIn = who.logged_in;
+			if (token) {
+				// As on a panel-open check: never log this browser's session
+				// in as whoever sits here now, if that is someone else.
+				var mine = store('lcff_acct');
+				if (!who.logged_in) {
+					if ((lastIdentity && lastIdentity.account) || mine) { logout(); }
+					return plain;
+				}
+				if (mine && mine !== who.acct) {
+					forget();
+					loggedIn = true;
+					recheckIdentity();
+					return plain;
+				}
+				// The login token is bound to `chat`; a newer token can't use it.
+				if (getToken() !== chat) { return plain; }
+			}
+			if (who.logged_in) {
 				body.login_token = who.token;
 				plain.acct = who.acct;
 			}
@@ -354,6 +384,7 @@
 			// Held again while the login token was fetched: wait and prepare afresh.
 			if (held) { return dispatch(job); }
 			job.acct = p.acct;
+			job.login = !!p.body.login_token;
 			return request('POST', '/messages', p.body, p.token);
 		});
 	}
@@ -417,6 +448,7 @@
 				node.setAttribute('data-id', String(dto.id));
 				rendered[dto.id] = node;
 			}
+			noteLogin(job.login, r.data.identity);
 			noteIdentity(r.data.identity);
 			if (job.gen !== gen) { return; } // the answer showed a logged-out account
 			updateNotice(r.data.conversation);
@@ -604,6 +636,9 @@
 	 * delay (N3): every switch would otherwise restart the full wait. */
 	function onVisibility() {
 		if (active() && !held) { markSeen(); }
+		// Back on this tab: someone may have logged out or in meanwhile, and
+		// a long chat keeps its account login fresh.
+		if (active()) { recheckIdentity(); }
 		if (!started) { return; }
 		if (failures && (pollTimer || polling)) { return; }
 		schedule(visible() ? 0 : undefined);
@@ -691,13 +726,31 @@
 	 * Every send, poll and identity answer carries the browser's identity.
 	 * When WordPress said "logged out" before this session's first answer
 	 * arrived, that answer decides: an account-bound session is forgotten.
+	 * When FreeScout let the account login lapse while WordPress still says
+	 * "logged in", a re-check refreshes it at once.
 	 */
 	function noteIdentity(identity) {
 		if (!identity || typeof identity.level !== 'string') { return; }
+		var had = !!(lastIdentity && lastIdentity.account);
 		lastIdentity = { level: identity.level, account: identity.account === true };
 		if (confirmLogout) {
 			confirmLogout = false;
-			if (lastIdentity.account) { logout(); }
+			if (lastIdentity.account) { logout(); return; }
+		}
+		if (had && !lastIdentity.account && loggedIn) { recheckIdentity(); }
+	}
+
+	/*
+	 * The answer to a request that carried a login token: FreeScout accepted
+	 * it (account: true), or rejected it, and then this browser counts as
+	 * not logged in, so the ask can appear (spec 5.1).
+	 */
+	function noteLogin(carried, identity) {
+		if (!carried || !identity || typeof identity.level !== 'string') { return; }
+		if (identity.account === true) {
+			lastLoginAt = Date.now();
+		} else {
+			loggedIn = false;
 		}
 	}
 
@@ -754,6 +807,7 @@
 		pendingToken = null;
 		lastIdentity = null;
 		loggedIn = false;
+		lastLoginAt = 0;
 		confirmLogout = false;
 		queue.length = 0;
 		clearView();
@@ -848,6 +902,29 @@
 		identityRound(true).then(finish, finish);
 	}
 
+	/*
+	 * The identity round again, for a browser WordPress says is logged in,
+	 * while the panel stays open: every RECHECK_EVERY, on returning to the
+	 * tab, and when an answer shows FreeScout let the account login lapse.
+	 * Unlike the panel-open check it never holds the list or the composer.
+	 */
+	function recheckIdentity() {
+		if (!loggedIn || checking || rechecking || !identityOn()) { return; }
+		rechecking = true;
+		var done = function () { rechecking = false; };
+		identityRound(true).then(done, done);
+	}
+
+	function armRecheck() {
+		if (recheckTimer) { clearTimeout(recheckTimer); recheckTimer = null; }
+		if (!isOpen) { return; }
+		recheckTimer = setTimeout(function () {
+			recheckTimer = null;
+			recheckIdentity();
+			armRecheck();
+		}, RECHECK_EVERY);
+	}
+
 	function identityRound(mayRetry) {
 		var stored = getToken();
 		if (!stored && !pendingToken) { pendingToken = newToken(); }
@@ -896,12 +973,17 @@
 		if (myGen !== gen) { return; }
 		if (r.status === 200 && r.data) {
 			if (getToken() === chat) { store('lcff_acct', acct); }
+			noteLogin(true, r.data.identity);
 			noteIdentity(r.data.identity);
 			if (myGen === gen) { kick(); }
 		} else if (r.status === 401) {
 			unauthorized(chat);
+		} else if (r.status === 403) {
+			// FreeScout rejected the login: this browser is not recognised,
+			// so the ask can appear (spec 5.1). The chat goes on.
+			loggedIn = false;
 		}
-		// 403 identity_rejected and anything else: carry on (Ruling P4).
+		// Anything else: carry on (Ruling P4).
 	}
 
 	function onDiscovery(r, chat, acct, myGen) {
@@ -912,8 +994,13 @@
 			if (!getToken()) { store('lcff_token', chat); }
 			if (getToken() === chat) { store('lcff_acct', acct); }
 			if (pendingToken === chat) { pendingToken = null; }
+			noteLogin(true, d.identity);
 			noteIdentity(d.identity);
 			if (myGen === gen) { kick(); }
+			return;
+		}
+		if (r.status === 403) {
+			loggedIn = false; // rejected, as in onLogin()
 			return;
 		}
 		if (r.status === 409 && !getToken() && pendingToken === chat) {
@@ -1252,6 +1339,7 @@
 		// One poll right away; it keeps polling only if the server says so.
 		if (getToken() && !started) { startPolling(); } else if (started) { schedule(0); }
 		checkIdentity();
+		armRecheck();
 		scrollDown();
 		if (!held) { el.input.focus(); } // else releaseList() focuses it
 	}
@@ -1261,6 +1349,7 @@
 		isOpen = false;
 		el.panel.hidden = true;
 		el.panel.classList.remove('lcff-panel--open');
+		armRecheck(); // stops the re-check timer
 		if (started) { schedule(); }
 	}
 
