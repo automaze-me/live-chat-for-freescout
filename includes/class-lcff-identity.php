@@ -26,16 +26,14 @@ class LCFF_Identity {
 		add_action( 'wp_ajax_nopriv_lcff_identity', array( __CLASS__, 'handle_identity' ) );
 		add_action( 'wp_ajax_lcff_order', array( __CLASS__, 'handle_order' ) );
 		add_action( 'wp_ajax_nopriv_lcff_order', array( __CLASS__, 'handle_order' ) );
+		// The signal is never cleared on wp_login: after a logout, core lands
+		// on wp-login.php, where the widget doesn't run, and the next person
+		// may log in right there. The widget expires the signal itself.
 		add_action( 'wp_logout', array( __CLASS__, 'set_logout_cookie' ) );
-		add_action( 'wp_login', array( __CLASS__, 'clear_logout_cookie' ) );
 	}
 
 	public static function set_logout_cookie() {
 		self::cookie( '1', time() + 600 );
-	}
-
-	public static function clear_logout_cookie() {
-		self::cookie( '', time() - HOUR_IN_SECONDS );
 	}
 
 	private static function cookie( $value, $expires ) {
@@ -160,7 +158,25 @@ class LCFF_Identity {
 		$payload['email'] = (string) $user->user_email;
 		$payload['name']  = self::truncate( $user->display_name );
 
-		self::seal_and_send( $payload, array( 'logged_in' => true ) );
+		self::seal_and_send(
+			$payload,
+			array(
+				'logged_in' => true,
+				'acct'      => self::account_marker( $user->ID ),
+			)
+		);
+	}
+
+	/**
+	 * Opaque per-site account marker: the widget compares it with the one it
+	 * stored to notice that another account logged in on this browser. No
+	 * personal data, not reversible without the site's auth salt.
+	 *
+	 * @param int $user_id WordPress user ID.
+	 * @return string 16 lowercase hex characters.
+	 */
+	public static function account_marker( $user_id ) {
+		return substr( hash_hmac( 'sha256', (string) $user_id, wp_salt( 'auth' ) ), 0, 16 );
 	}
 
 	public static function handle_order() {

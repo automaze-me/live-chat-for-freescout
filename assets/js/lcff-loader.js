@@ -69,7 +69,7 @@
 				}).then(null, function () {});
 			} catch (e) {}
 		}
-		var keys = ['lcff_token', 'lcff_seen', 'lcff_ask'];
+		var keys = ['lcff_token', 'lcff_seen', 'lcff_ask', 'lcff_acct'];
 		for (var k = 0; k < keys.length; k++) {
 			try {
 				window.localStorage.removeItem(keys[k]);

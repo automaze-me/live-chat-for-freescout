@@ -64,6 +64,7 @@
 	var loggedIn = false;      // WordPress said "logged in" on its latest answer
 	var confirmLogout = false; // logged out, and the session's first answer decides (see checkIdentity)
 	var checking = false;      // a panel-open identity check is running
+	var held = false;          // the message list is hidden until that check settles
 	var gen = 0;               // bumped by forget(); answers to older requests are dropped
 
 	function visible() { return document.visibilityState === 'visible'; }
@@ -274,24 +275,28 @@
 	}
 
 	/*
-	 * Resolves to the body and chat token of a send. A tokenless send carries
-	 * the pending token as `new_token`; when WordPress last said "logged in",
-	 * it also carries a fresh login token bound to it (each one is
-	 * single-use), so the conversation starts as an account conversation
-	 * (Ruling P7). Never rejects.
+	 * Resolves to the body, chat token and account marker of a send. A
+	 * tokenless send carries the pending token as `new_token`; when WordPress
+	 * last said "logged in", it also carries a fresh login token bound to it
+	 * (each one is single-use), so the conversation starts as an account
+	 * conversation (Ruling P7), and `acct` is that account's marker. Never
+	 * rejects.
 	 */
 	function prepareSend(job) {
 		var body = { text: job.text, client_message_id: job.clientId };
 		var token = getToken();
-		if (token) { return Promise.resolve({ body: body, token: token }); }
+		if (token) { return Promise.resolve({ body: body, token: token, acct: null }); }
 		if (!pendingToken) { pendingToken = newToken(); }
 		var chat = pendingToken;
 		body.new_token = chat;
-		var plain = { body: body, token: null };
+		var plain = { body: body, token: null, acct: null };
 		if (!loggedIn || !identityOn()) { return Promise.resolve(plain); }
 		return wpIdentity(chat).then(function (who) {
 			if (who) { loggedIn = who.logged_in; }
-			if (who && who.logged_in) { body.login_token = who.token; }
+			if (who && who.logged_in) {
+				body.login_token = who.token;
+				plain.acct = who.acct;
+			}
 			return plain;
 		});
 	}
@@ -315,6 +320,7 @@
 			sent = prepareSend(job).then(function (p) {
 				// The widget forgot everything while the login token was fetched.
 				if (job.gen !== gen) { throw new Error('lcff: forgotten'); }
+				job.acct = p.acct;
 				return request('POST', '/messages', p.body, p.token);
 			});
 		} catch (e) {
@@ -361,6 +367,10 @@
 			}
 			noteIdentity(r.data.identity);
 			if (job.gen !== gen) { return; } // the answer showed a logged-out account
+			// The login token was accepted: remember whose account this browser holds.
+			if (job.acct && r.data.identity && r.data.identity.account === true) {
+				store('lcff_acct', job.acct);
+			}
 			// A message was just sent, so there is something to wait for again,
 			// and the server is reachable: a backing-off poller is rescheduled.
 			var wasBackingOff = failures > 0;
@@ -510,7 +520,7 @@
 		initialDone = true;
 		if (newAgent) { setUnread(unread + newAgent); }
 		if (added && el.list) { scrollDown(); }
-		if (active()) { markSeen(); }
+		if (active() && !held) { markSeen(); }
 	}
 
 	function markSeen() {
@@ -537,7 +547,7 @@
 	 * becomes visible. While it is backing off, the armed timer keeps its
 	 * delay (N3): every switch would otherwise restart the full wait. */
 	function onVisibility() {
-		if (active()) { markSeen(); }
+		if (active() && !held) { markSeen(); }
 		if (!started) { return; }
 		if (failures && (pollTimer || polling)) { return; }
 		schedule(visible() ? 0 : undefined);
@@ -575,8 +585,9 @@
 	 * Asks WordPress (same origin, with its cookies) who is logged in. The
 	 * login token in the answer is bound to `chat`, by default the stored
 	 * token or else the pending one, lives 300 s and is single-use: fetch a
-	 * fresh one for every use. Resolves to {logged_in, token}, or null on
-	 * any failure (Ruling P4: carry on). Never rejects.
+	 * fresh one for every use. Resolves to {logged_in, token, acct}, or null
+	 * on any failure (Ruling P4: carry on). Never rejects. `acct` is an
+	 * opaque per-site account marker (16 hex), null when logged out.
 	 */
 	function wpIdentity(chat) {
 		if (chat === undefined) { chat = getToken() || pendingToken; }
@@ -607,9 +618,10 @@
 					var d = null;
 					try { d = JSON.parse(t); } catch (e2) {}
 					if (!res.ok || !d || typeof d.logged_in !== 'boolean') { return null; }
-					if (!d.logged_in) { return { logged_in: false, token: null }; }
-					return typeof d.token === 'string' && d.token.indexOf('v1.') === 0
-						? { logged_in: true, token: d.token }
+					if (!d.logged_in) { return { logged_in: false, token: null, acct: null }; }
+					return typeof d.token === 'string' && d.token.indexOf('v1.') === 0 &&
+						typeof d.acct === 'string' && /^[a-f0-9]{16}$/.test(d.acct)
+						? { logged_in: true, token: d.token, acct: d.acct }
 						: null;
 				});
 			}).then(null, function () {
@@ -635,15 +647,16 @@
 
 	/*
 	 * A 401: the session behind `used` is gone. The stored token, with the
-	 * seen marker and ask state that belong to it, is dropped only while it
-	 * is still the token the request used; a newer one stays. Returns
-	 * whether it dropped.
+	 * seen marker, ask state and account marker that belong to it, is
+	 * dropped only while it is still the token the request used; a newer one
+	 * stays. Returns whether it dropped.
 	 */
 	function unauthorized(used) {
 		if (!used || getToken() !== used) { return false; }
 		store('lcff_token', null);
 		store('lcff_seen', null);
 		store('lcff_ask', null);
+		store('lcff_acct', null);
 		pendingToken = null;
 		lastIdentity = null;
 		stopPolling();
@@ -677,6 +690,7 @@
 		store('lcff_token', null);
 		store('lcff_seen', null);
 		store('lcff_ask', null);
+		store('lcff_acct', null);
 		pendingToken = null;
 		lastIdentity = null;
 		loggedIn = false;
@@ -711,8 +725,31 @@
 	}
 
 	/*
+	 * While this browser holds an account login (lcff_acct), open() hides the
+	 * message list until the panel-open check settles: the person in front
+	 * of it may not be that account's owner. Any outcome shows it again,
+	 * failures included (Ruling P4: fail open).
+	 */
+	function holdList() {
+		if (!built) { return; }
+		held = true;
+		el.list.style.visibility = 'hidden';
+		el.list.setAttribute('aria-busy', 'true');
+	}
+
+	function releaseList() {
+		if (!held) { return; }
+		held = false;
+		el.list.style.visibility = '';
+		el.list.removeAttribute('aria-busy');
+		if (active()) { markSeen(); }
+	}
+
+	/*
 	 * On every panel open, when identity is on: asks WordPress who is logged
 	 * in, then
+	 * - logged in as another account than the stored marker: forget() and
+	 *   go on as a device without a token;
 	 * - logged in, token stored: refreshes the account login (Ruling P4);
 	 * - logged in, no token: looks for the account's chats with the pending
 	 *   token, which is stored only when FreeScout created a session for it
@@ -721,25 +758,43 @@
 	 * - failed: nothing changes (Ruling P4).
 	 */
 	function checkIdentity() {
-		if (checking || !identityOn()) { return; }
+		if (checking) { return; }
+		if (!identityOn()) { releaseList(); return; }
+		checking = true;
+		confirmLogout = false;
+		var finish = function () {
+			checking = false;
+			releaseList();
+		};
+		identityRound(true).then(finish, finish);
+	}
+
+	function identityRound(mayRetry) {
 		var stored = getToken();
 		if (!stored && !pendingToken) { pendingToken = newToken(); }
 		var chat = stored || pendingToken;
 		var myGen = gen;
-		checking = true;
-		confirmLogout = false;
-		var finish = function () { checking = false; };
-		wpIdentity(chat).then(function (who) {
+		return wpIdentity(chat).then(function (who) {
 			if (!who || myGen !== gen) { return null; }
 			if (!who.logged_in) {
 				loggedIn = false;
-				if (lastIdentity && lastIdentity.account) {
+				if ((lastIdentity && lastIdentity.account) || store('lcff_acct')) {
 					logout();
 				} else if (!lastIdentity && getToken()) {
 					// The session's first answer is still outstanding; it decides.
 					confirmLogout = true;
 				}
 				return null;
+			}
+			var mine = store('lcff_acct');
+			if (mine && mine !== who.acct) {
+				// Another account logged in on this browser (a shared computer
+				// whose logout signal never reached the widget): nothing of the
+				// previous account may show. The login token above is bound to
+				// the old chat token, so the next round fetches a fresh one.
+				forget();
+				loggedIn = true;
+				return mayRetry ? identityRound(false) : null;
 			}
 			loggedIn = true;
 			var now = getToken();
@@ -748,19 +803,20 @@
 				// meanwhile stored `chat` itself; any other token can't use it.
 				if (now !== chat) { return null; }
 				return request('POST', '/identity', { login_token: who.token }, chat).then(function (r) {
-					onLogin(r, chat, myGen);
+					onLogin(r, chat, who.acct, myGen);
 				});
 			}
 			if (pendingToken !== chat) { return null; }
 			return request('POST', '/identity', { login_token: who.token, new_token: chat }, null).then(function (r) {
-				onDiscovery(r, chat, myGen);
+				onDiscovery(r, chat, who.acct, myGen);
 			});
-		}).then(finish, finish);
+		});
 	}
 
-	function onLogin(r, chat, myGen) {
+	function onLogin(r, chat, acct, myGen) {
 		if (myGen !== gen) { return; }
 		if (r.status === 200 && r.data) {
+			if (getToken() === chat) { store('lcff_acct', acct); }
 			noteIdentity(r.data.identity);
 			if (myGen === gen) { kick(); }
 		} else if (r.status === 401) {
@@ -769,12 +825,13 @@
 		// 403 identity_rejected and anything else: carry on (Ruling P4).
 	}
 
-	function onDiscovery(r, chat, myGen) {
+	function onDiscovery(r, chat, acct, myGen) {
 		if (myGen !== gen) { return; }
 		var d = r.data || {};
 		if (r.status === 200 && d.token === chat) {
 			// The account has chats here; FreeScout created the session.
 			if (!getToken()) { store('lcff_token', chat); }
+			if (getToken() === chat) { store('lcff_acct', acct); }
 			if (pendingToken === chat) { pendingToken = null; }
 			noteIdentity(d.identity);
 			if (myGen === gen) { kick(); }
@@ -792,9 +849,10 @@
 	function open() {
 		build();
 		isOpen = true;
+		if (identityOn() && store('lcff_acct')) { holdList(); }
 		el.panel.hidden = false;
 		el.panel.classList.add('lcff-panel--open');
-		markSeen();
+		if (!held) { markSeen(); }
 		// One poll right away; it keeps polling only if the server says so.
 		if (getToken() && !started) { startPolling(); } else if (started) { schedule(0); }
 		checkIdentity();
