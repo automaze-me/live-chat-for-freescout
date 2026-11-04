@@ -23,11 +23,9 @@ class LCFF_Widget {
 		$s = LCFF_Settings::get();
 
 		// Decided per request path on the server, so a full-page cache (which keys on the URL) stays correct.
-		$request_path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH ) : '/';
-		if ( '' === $request_path ) {
-			$request_path = '/';
-		}
-		if ( LCFF_Appearance::is_hidden( rawurldecode( $request_path ), $s['hidden_paths'] ) ) {
+		$request_uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+		$request_path = LCFF_Appearance::request_path( (string) $request_uri, (string) wp_parse_url( home_url(), PHP_URL_PATH ) );
+		if ( LCFF_Appearance::is_hidden( $request_path, $s['hidden_paths'] ) ) {
 			return;
 		}
 

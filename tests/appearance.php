@@ -64,5 +64,12 @@ t( 'hidden: root listed', LCFF_Appearance::is_hidden( '/', '/' ), true );
 t( 'hidden: second line', LCFF_Appearance::is_hidden( '/cart', "/checkout\n/cart/" ), true );
 t( 'hidden: case sensitive paths kept', LCFF_Appearance::is_hidden( '/Cart', '/cart' ), false );
 
+t( 'path: subdir stripped, query dropped', LCFF_Appearance::request_path( '/blog/checkout/?x=1', '/blog' ), '/checkout/' );
+t( 'path: subdir root', LCFF_Appearance::request_path( '/blog', '/blog' ), '/' );
+t( 'path: subdir root slash', LCFF_Appearance::request_path( '/blog/', '/blog/' ), '/' );
+t( 'path: no partial segment strip', LCFF_Appearance::request_path( '/blogger/x', '/blog' ), '/blogger/x' );
+t( 'path: leading double slash', LCFF_Appearance::request_path( '//checkout/', '' ), '/checkout/' );
+t( 'path: empty home unchanged', LCFF_Appearance::request_path( '/a/b?c=1', '' ), '/a/b' );
+
 echo $ok ? "PASS\n" : "FAIL\n";
 exit( $ok ? 0 : 1 );

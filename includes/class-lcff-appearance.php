@@ -73,6 +73,27 @@ class LCFF_Appearance {
 	}
 
 	/**
+	 * The request path relative to the site root: query dropped, leading
+	 * repeated slashes collapsed, the install path (e.g. /blog) stripped,
+	 * percent-encoding decoded.
+	 */
+	public static function request_path( $request_uri, $home_path ) {
+		$uri  = preg_replace( '#^/{2,}#', '/', (string) $request_uri );
+		$path = (string) parse_url( $uri, PHP_URL_PATH );
+		if ( '' === $path ) {
+			$path = '/';
+		}
+		$home = rtrim( (string) $home_path, '/' );
+		if ( '' !== $home && ( $path === $home || 0 === strpos( $path, $home . '/' ) ) ) {
+			$path = substr( $path, strlen( $home ) );
+			if ( '' === $path ) {
+				$path = '/';
+			}
+		}
+		return rawurldecode( $path );
+	}
+
+	/**
 	 * True when $path is on the hidden list. A line ending in * matches that
 	 * prefix, any other line matches the path exactly; a trailing slash is
 	 * ignored.
