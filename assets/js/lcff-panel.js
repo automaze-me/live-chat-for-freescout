@@ -53,6 +53,7 @@
 	var rendered = {};      // server id -> element
 	var unseenAgentIds = [];  // agent ids rendered while active, not yet queued
 	var pendingSeen = {};     // id -> true: queued for /seen until the server accepts or refuses them
+	var confirmedSeen = {};   // id -> true: the server answered 204 for it (this page)
 	var seenInFlight = false; // a /seen request is running
 	var seenSeq = 0;          // bumped per /seen request and when receipts are discarded; older answers are ignored
 	var unread = 0;
@@ -619,12 +620,14 @@
 	 * failure leave them pending; the next trigger (poll answer, visibility
 	 * change, panel open) retries, so there is no loop of its own. At most
 	 * 100 ids go out per request, the server's cap.
+	 *
+	 * lcff_seen moves only after a 204 (storeSeen): a receipt lost to an
+	 * error or to leaving the page is sent again by the next page.
 	 */
 	function markSeen() {
 		// Seen means: panel open, tab visible, list released (spec 7).
 		if (!active() || held) { return; }
 		if (unread) { setUnread(0); }
-		if (lastAgentId() > 0) { store('lcff_seen', String(lastAgentId())); }
 		unseenAgentIds.forEach(function (id) { pendingSeen[id] = true; });
 		unseenAgentIds = [];
 		if (seenInFlight || !getToken()) { return; }
@@ -636,7 +639,11 @@
 			if (mySeq !== seenSeq) { return; } // discarded meanwhile (forget, logout, dropped token)
 			seenInFlight = false;
 			if (r.status === 204 || r.status === 422) {
-				ids.forEach(function (id) { delete pendingSeen[id]; });
+				ids.forEach(function (id) {
+					delete pendingSeen[id];
+					if (r.status === 204) { confirmedSeen[id] = true; }
+				});
+				if (r.status === 204) { storeSeen(); }
 				if (r.status === 204 && active() && !held) { markSeen(); }
 			} else if (r.status === 401) {
 				unauthorized(r.token);
@@ -646,12 +653,22 @@
 		});
 	}
 
-	function lastAgentId() {
-		var max = 0;
-		Object.keys(rendered).forEach(function (k) {
-			if (rendered[k].getAttribute('data-role') === 'agent' && +k > max) { max = +k; }
+	/*
+	 * lcff_seen lets the next page skip agent ids that need no receipt (and
+	 * no unread count): the highest id the server confirmed, never past an id
+	 * still waiting for its receipt (pending, or not yet queued). It never
+	 * moves back.
+	 */
+	function storeSeen() {
+		var floor = Infinity;
+		Object.keys(pendingSeen).forEach(function (k) { if (+k < floor) { floor = +k; } });
+		unseenAgentIds.forEach(function (id) { if (id < floor) { floor = id; } });
+		var stored = parseInt(store('lcff_seen') || '0', 10) || 0;
+		var best = stored;
+		Object.keys(confirmedSeen).forEach(function (k) {
+			if (+k > best && +k < floor) { best = +k; }
 		});
-		return max;
+		if (best > stored) { store('lcff_seen', String(best)); }
 	}
 
 	/* Never restarts a stopped poller; a running one polls at once when the tab
@@ -799,6 +816,7 @@
 
 	function discardSeen() {
 		pendingSeen = {};
+		confirmedSeen = {};
 		unseenAgentIds = [];
 		seenInFlight = false;
 		seenSeq++;
