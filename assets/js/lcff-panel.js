@@ -68,6 +68,8 @@
 	var gen = 0;               // bumped by forget(); answers to older requests are dropped
 	var askCard = null;        // the email / order-number card on screen, if any
 	var askSeq = 0;
+	var noticeEl = null;       // the one .lcff-notice at the end of the list, if any
+	var continueCard = null;   // the continue-link prompt on screen, if any
 
 	function visible() { return document.visibilityState === 'visible'; }
 	function active() { return isOpen && visible(); }
@@ -223,9 +225,39 @@
 			n.appendChild(mk('div', 'lcff-author', String(m.author)));
 		}
 		n.appendChild(mk('div', 'lcff-text', String(m.text)));
+		if (m.via === 'email') {
+			n.appendChild(mk('div', 'lcff-via', strings.viaEmail || ''));
+		}
 		rendered[m.id] = n;
 		el.list.appendChild(n);
 		return n;
+	}
+
+	/*
+	 * `conversation.notice` (null, 'continues_by_email' or 'continues_elsewhere')
+	 * is one element at the end of the list, updated in place and removed when
+	 * the notice goes. A response without a `notice` key changes nothing.
+	 */
+	function updateNotice(conv) {
+		if (!built || !conv || typeof conv !== 'object' || conv.notice === undefined) { return; }
+		var text = conv.notice === 'continues_by_email' ? strings.noticeEmail
+			: conv.notice === 'continues_elsewhere' ? strings.noticeElsewhere : '';
+		if (!text) {
+			if (noticeEl && noticeEl.parentNode) { noticeEl.parentNode.removeChild(noticeEl); }
+			noticeEl = null;
+			return;
+		}
+		if (!noticeEl) { noticeEl = mk('div', 'lcff-notice'); }
+		noticeEl.setAttribute('role', 'status');
+		if (noticeEl.textContent !== text) { noticeEl.textContent = text; }
+		if (el.list.lastChild !== noticeEl) { el.list.appendChild(noticeEl); scrollDown(); }
+	}
+
+	/* Keeps the notice last after something was appended behind it. */
+	function keepNoticeLast() {
+		if (noticeEl && noticeEl.parentNode === el.list && el.list.lastChild !== noticeEl) {
+			el.list.appendChild(noticeEl);
+		}
 	}
 
 	function addPending(text, clientId) {
@@ -234,6 +266,7 @@
 		n.setAttribute('data-client-id', clientId);
 		n.appendChild(mk('div', 'lcff-text', text));
 		el.list.appendChild(n);
+		keepNoticeLast();
 		scrollDown();
 		return n;
 	}
@@ -385,6 +418,7 @@
 			}
 			noteIdentity(r.data.identity);
 			if (job.gen !== gen) { return; } // the answer showed a logged-out account
+			updateNotice(r.data.conversation);
 			// The login token was accepted: remember whose account this browser holds.
 			if (job.acct && r.data.identity && r.data.identity.account === true) {
 				store('lcff_acct', job.acct);
@@ -500,6 +534,7 @@
 				if (Array.isArray(data.messages)) {
 					handleMessages(data.messages);
 				}
+				updateNotice(data.conversation);
 			} finally {
 				polling = false;
 				// N1: a send or login while this poll was in flight.
@@ -538,6 +573,7 @@
 		}
 		initialDone = true;
 		if (newAgent) { setUnread(unread + newAgent); }
+		keepNoticeLast();
 		if (added && el.list) { scrollDown(); }
 		if (active() && !held) { markSeen(); }
 	}
@@ -697,6 +733,8 @@
 			if (kids[i] !== el.welcome) { el.list.removeChild(kids[i]); }
 		}
 		askCard = null;
+		noticeEl = null;
+		continueCard = null;
 	}
 
 	/*
@@ -1095,6 +1133,97 @@
 		}).then(null, function () { return null; });
 	}
 
+	/* ---- continue-chat links (spec 5.3, Ruling P11) ---- */
+
+	/* Redeems the link: 200 -> resolves 'ok'; 410/422 -> 'invalid'; else 'error'. */
+	function redeem(link, retried) {
+		var stored = getToken();
+		var body = { link: link };
+		if (!stored) {
+			if (!pendingToken) { pendingToken = newToken(); }
+			body.new_token = pendingToken;
+		}
+		var used = pendingToken;
+		return request('POST', '/continue', body, stored || null).then(function (r) {
+			if (r.status === 200 && r.data) {
+				// The token is stored only after the 2xx (spec 10).
+				var confirmed = r.hadToken ? r.token : (r.data.token || used);
+				if (confirmed) { store('lcff_token', confirmed); }
+				pendingToken = null;
+				// The full history replaces whatever this browser showed.
+				gen++;
+				stopPolling();
+				failures = 0;
+				store('lcff_seen', null);
+				store('lcff_ask', null);
+				clearView();
+				noteIdentity(r.data.identity);
+				kick();
+				return 'ok';
+			}
+			if (r.status === 410 || r.status === 422) {
+				if (r.status === 422 && r.data && r.data.field === 'new_token' && !retried) {
+					pendingToken = newToken();
+					return redeem(link, true);
+				}
+				return 'invalid';
+			}
+			if (!retried && r.status === 409 && !r.hadToken) {
+				pendingToken = newToken();
+				return redeem(link, true);
+			}
+			if (!retried && r.status === 401 && r.hadToken) {
+				unauthorized(r.token);
+				return redeem(link, true);
+			}
+			return 'error';
+		}, function () { return 'error'; });
+	}
+
+	/*
+	 * A visitor opened a continue link. Nothing is sent until the explicit
+	 * click on the button (P11); the loader already took the secret out of the
+	 * address bar.
+	 */
+	function continueChat(link) {
+		if (typeof link !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(link)) { return; }
+		open();
+		if (continueCard && continueCard.parentNode) { continueCard.parentNode.removeChild(continueCard); }
+		var card = mk('div', 'lcff-ask lcff-continue');
+		card.appendChild(mk('div', 'lcff-ask-intro', strings.continuePrompt || ''));
+		var failed = mk('div', 'lcff-ask-error', strings.continueFailed || '');
+		failed.setAttribute('role', 'alert');
+		failed.hidden = true;
+		var row = mk('div', 'lcff-ask-actions');
+		var go = mk('button', 'lcff-ask-ok lcff-continue-go', strings.continueButton || 'Continue');
+		go.type = 'button';
+		row.appendChild(go);
+		card.appendChild(failed);
+		card.appendChild(row);
+		var busy = false;
+		go.addEventListener('click', function () {
+			if (busy) { return; }
+			busy = true;
+			go.disabled = true;
+			failed.hidden = true;
+			redeem(link, false).then(function (outcome) {
+				if (outcome === 'ok') { return; } // clearView() removed the card
+				busy = false;
+				failed.hidden = false;
+				if (outcome === 'invalid') {
+					row.style.display = 'none'; // a spent link stays spent
+				} else {
+					go.disabled = false;
+				}
+			});
+		});
+		continueCard = card;
+		el.list.appendChild(card);
+		keepNoticeLast();
+		scrollDown();
+		go.focus();
+	}
+
 	/* ---- public API ---- */
 	function open() {
 		build();
@@ -1123,5 +1252,5 @@
 		if (getToken() && !started) { startPolling(); }
 	}
 
-	window.LCFF = { open: open, close: close, resume: resume, logout: logout };
+	window.LCFF = { open: open, close: close, resume: resume, logout: logout, continueChat: continueChat };
 })();

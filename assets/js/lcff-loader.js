@@ -137,12 +137,30 @@
 
 	/* Just logged out: forget, and don't resume. Returning visitor: load right
 	 * away so history and unread badge work. */
+	var continueMatch = /^#lcff-continue=([A-Za-z0-9_-]{43})$/.exec(window.location.hash || '');
+	if (continueMatch) {
+		/* P11: the secret leaves the address bar before anything else runs. */
+		try {
+			window.history.replaceState(null, '', window.location.pathname + window.location.search);
+		} catch (e) {}
+	}
+
 	if (logoutSignalled()) {
 		forgetAfterLogout();
-	} else if (storedToken()) {
+	} else if (storedToken() && !continueMatch) {
 		loadPanel().then(function () {
 			if (window.LCFF) {
 				window.LCFF.resume();
+			}
+		}, function () {});
+	}
+
+	/* Nothing is redeemed here: the panel asks for one click first. */
+	if (continueMatch) {
+		var linkToken = continueMatch[1];
+		loadPanel().then(function () {
+			if (window.LCFF) {
+				window.LCFF.continueChat(linkToken);
 			}
 		}, function () {});
 	}

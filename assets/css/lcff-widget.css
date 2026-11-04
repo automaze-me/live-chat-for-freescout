@@ -326,3 +326,20 @@
 		font-size: 16px;
 	}
 }
+
+.lcff-via {
+	margin-top: 2px;
+	font-size: 11px;
+	opacity: 0.7;
+}
+
+.lcff-notice {
+	align-self: center;
+	margin: 8px 12px;
+	padding: 8px 12px;
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.05);
+	font-size: 12px;
+	line-height: 1.4;
+	text-align: center;
+}
