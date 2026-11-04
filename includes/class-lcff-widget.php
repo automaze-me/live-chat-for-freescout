@@ -45,6 +45,7 @@ class LCFF_Widget {
 				'send'        => __( 'Send', 'live-chat-for-freescout' ),
 				'close'       => __( 'Close chat', 'live-chat-for-freescout' ),
 				'retry'       => __( "Couldn't send. Tap to retry.", 'live-chat-for-freescout' ),
+				'unsent'      => __( "This message couldn't be sent.", 'live-chat-for-freescout' ),
 			),
 		);
 

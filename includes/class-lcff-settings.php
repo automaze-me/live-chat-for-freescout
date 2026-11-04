@@ -105,7 +105,7 @@ class LCFF_Settings {
 				'key'         => 'site_id',
 				'type'        => 'text',
 				'placeholder' => '0123456789abcdef0123456789abcdef',
-				'description' => __( 'The 32-character site ID shown in the FreeScout mailbox settings.', 'live-chat-for-freescout' ),
+				'description' => __( 'The 32-character site ID, shown in FreeScout under Manage → Website Chat when you open your website.', 'live-chat-for-freescout' ),
 			)
 		);
 	}

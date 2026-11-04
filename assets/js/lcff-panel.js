@@ -10,6 +10,8 @@
 	var API = cfg.apiBase;
 	var POLL_FAST = 3000;
 	var POLL_SLOW = 30000;
+	var POLL_MAX = 600000;       // backoff ceiling: 10 min
+	var REQUEST_TIMEOUT = 20000; // every request is aborted after 20 s
 
 	/* ---- storage with in-memory fallback ---- */
 	var mem = {};
@@ -33,6 +35,19 @@
 	}
 	function getToken() { return store('lcff_token'); }
 
+	/*
+	 * The token for this browser's first message is generated here, not by the
+	 * server, so a retry of a first message whose response was lost lands in
+	 * the same session. It stays in memory only (never in storage) until a 2xx
+	 * response confirms it, and every tokenless send of this page reuses it.
+	 */
+	var pendingToken = null;
+
+	function dropToken() {
+		store('lcff_token', null);
+		pendingToken = null;
+	}
+
 	/* ---- state ---- */
 	var isOpen = false;
 	var built = false;
@@ -44,6 +59,7 @@
 	var unread = 0;
 	var pollTimer = null;
 	var polling = false;
+	var failures = 0;       // consecutive failed polls, for the backoff
 	var initialDone = false;
 	var el = {};
 
@@ -68,22 +84,55 @@
 		return hex;
 	}
 
-	function request(method, path, body, useToken) {
-		var headers = {};
-		var token = getToken();
-		if (useToken !== false && token) { headers['X-Chat-Token'] = token; }
-		var init = { method: method, headers: headers, mode: 'cors', credentials: 'omit' };
-		if (body !== undefined) {
-			headers['Content-Type'] = 'application/json';
-			init.body = JSON.stringify(body);
+	/* 32 random bytes, base64url without padding: 43 characters of [A-Za-z0-9_-]. */
+	function newToken() {
+		var a = new Uint8Array(32);
+		window.crypto.getRandomValues(a);
+		var bin = '';
+		for (var i = 0; i < a.length; i++) { bin += String.fromCharCode(a[i]); }
+		return window.btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	}
+
+	/*
+	 * Resolves to { status, data, hadToken }; rejects on a network error or
+	 * after REQUEST_TIMEOUT (where AbortController exists). Never throws.
+	 */
+	function request(method, path, body) {
+		var timer = null;
+		function clear() {
+			if (timer) { clearTimeout(timer); timer = null; }
 		}
-		return fetch(API + path, init).then(function (res) {
-			return res.text().then(function (t) {
-				var data = null;
-				try { data = t ? JSON.parse(t) : null; } catch (e) {}
-				return { status: res.status, data: data, hadToken: !!token };
+		try {
+			var headers = {};
+			var token = getToken();
+			if (token) { headers['X-Chat-Token'] = token; }
+			var init = { method: method, headers: headers, mode: 'cors', credentials: 'omit' };
+			if (body !== undefined) {
+				headers['Content-Type'] = 'application/json';
+				init.body = JSON.stringify(body);
+			}
+			try {
+				if (typeof window.AbortController === 'function') {
+					var ctrl = new window.AbortController();
+					init.signal = ctrl.signal;
+					timer = setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT);
+				}
+			} catch (e) {}
+			return fetch(API + path, init).then(function (res) {
+				return res.text().then(function (t) {
+					clear();
+					var data = null;
+					try { data = t ? JSON.parse(t) : null; } catch (e2) {}
+					return { status: res.status, data: data, hadToken: !!token };
+				});
+			}).then(null, function (err) {
+				clear();
+				throw err;
 			});
-		});
+		} catch (e3) {
+			clear();
+			return Promise.reject(e3);
+		}
 	}
 
 	function mk(tag, cls, text) {
@@ -195,9 +244,10 @@
 
 	/*
 	 * FIFO send queue: exactly one POST is in flight at any time, in submit order.
-	 * The token is read when a POST is dispatched (see request()), so messages
-	 * queued behind the first one carry the token the first response issued and
-	 * all land in the same conversation.
+	 * The token is read when a POST is dispatched (see request()). Before the
+	 * first 2xx, every POST carries the same pending token as `new_token`, so
+	 * messages queued behind the first one, and retries of it, all land in the
+	 * same session and conversation.
 	 */
 	var queue = [];
 	var inFlight = false;
@@ -206,6 +256,7 @@
 		if (job.node.getAttribute('data-queued') === '1') { return; }
 		job.node.setAttribute('data-queued', '1');
 		job.node.classList.remove('lcff-message--failed');
+		job.node.classList.remove('lcff-message--rejected');
 		job.node.classList.add('lcff-message--sending');
 		job.node.onclick = null;
 		job.node.onkeydown = null;
@@ -221,65 +272,105 @@
 		if (inFlight || !queue.length) { return; }
 		inFlight = true;
 		var job = queue.shift();
+		var settled = false;
+		// Runs exactly once per job, whatever throws, so inFlight never sticks.
 		var done = function () {
+			if (settled) { return; }
+			settled = true;
 			job.node.removeAttribute('data-queued');
 			inFlight = false;
 			pump();
 		};
-		request('POST', '/messages', { text: job.text, client_message_id: job.clientId }).then(function (r) {
-			var node = job.node;
-			if ((r.status === 201 || r.status === 200) && r.data && r.data.message) {
-				if (r.data.token) { store('lcff_token', r.data.token); }
-				var dto = r.data.message;
-				node.classList.remove('lcff-message--sending');
-				if (rendered[dto.id] && rendered[dto.id] !== node) {
-					// A poll already rendered this message; drop the pending copy.
-					if (node.parentNode) { node.parentNode.removeChild(node); }
-				} else {
-					node.setAttribute('data-id', String(dto.id));
-					rendered[dto.id] = node;
-				}
-				if (!started) { startPolling(); }
-			} else {
-				if (r.status === 401 && r.hadToken) {
-					store('lcff_token', null);
-					stopPolling();
-				}
-				fail(job);
+		var sent;
+		try {
+			var body = { text: job.text, client_message_id: job.clientId };
+			if (!getToken()) {
+				if (!pendingToken) { pendingToken = newToken(); }
+				body.new_token = pendingToken;
 			}
-			done();
+			sent = request('POST', '/messages', body);
+		} catch (e) {
+			sent = Promise.reject(e);
+		}
+		sent.then(function (r) {
+			try {
+				onSendResponse(job, r);
+			} finally {
+				done();
+			}
 		}, function () {
-			fail(job);
+			// Network error or timeout: retryable with the same client_message_id
+			// and, before the first 2xx, the same pending token.
+			try {
+				fail(job, true);
+			} finally {
+				done();
+			}
+		}).then(null, function () {
 			done();
 		});
 	}
 
-	/*
-	 * A failed message does not block the queue while a session exists (a
-	 * permanent 422/409 must not stall the chat). Without a token, though, every
-	 * later queued message would open its own new session, so those are put into
-	 * the retry state too; the visitor retries them in any order and the first
-	 * success issues the token the rest then share.
-	 */
-	function fail(job) {
-		failNode(job);
-		if (!getToken()) {
-			var rest = queue;
-			queue = [];
-			rest.forEach(failNode);
+	function onSendResponse(job, r) {
+		var node = job.node;
+		if ((r.status === 201 || r.status === 200) && r.data && r.data.message) {
+			if (!r.hadToken) {
+				// The server echoes the pending token; from now on it is the session token.
+				var confirmed = r.data.token || pendingToken;
+				if (confirmed) { store('lcff_token', confirmed); }
+				pendingToken = null;
+			}
+			var dto = r.data.message;
+			node.classList.remove('lcff-message--sending');
+			if (rendered[dto.id] && rendered[dto.id] !== node) {
+				// A poll already rendered this message; drop the pending copy.
+				if (node.parentNode) { node.parentNode.removeChild(node); }
+			} else {
+				node.setAttribute('data-id', String(dto.id));
+				rendered[dto.id] = node;
+			}
+			// A message was just sent, so there is something to wait for again,
+			// and the server is reachable: a backing-off poller is rescheduled.
+			var wasBackingOff = failures > 0;
+			failures = 0;
+			if (!started) { startPolling(); } else if (wasBackingOff) { schedule(); }
+			return;
 		}
+		if (r.status === 401 && r.hadToken) {
+			dropToken();
+			stopPolling();
+		}
+		// 409 (same id, different text; or a token taken elsewhere) and 422
+		// (invalid input) come back identically on every retry.
+		fail(job, r.status !== 409 && r.status !== 422);
 	}
 
-	function failNode(job) {
+	/*
+	 * A failed message never blocks the queue: done() moves on to the next one.
+	 * Before the first 2xx the next one carries the same pending token, so it
+	 * still joins the same session.
+	 */
+	function fail(job, retryable) {
 		var node = job.node;
 		node.removeAttribute('data-queued');
 		node.classList.remove('lcff-message--sending');
+		node.onclick = null;
+		node.onkeydown = null;
+		var note = node.querySelector('.lcff-retry, .lcff-unsent');
+		if (note) { node.removeChild(note); }
+
+		if (!retryable) {
+			node.classList.add('lcff-message--rejected');
+			node.removeAttribute('role');
+			node.removeAttribute('tabindex');
+			node.appendChild(mk('div', 'lcff-unsent', strings.unsent || ''));
+			return;
+		}
+
 		node.classList.add('lcff-message--failed');
 		node.setAttribute('role', 'button');
 		node.setAttribute('tabindex', '0');
-		if (!node.querySelector('.lcff-retry')) {
-			node.appendChild(mk('div', 'lcff-retry', strings.retry || ''));
-		}
+		node.appendChild(mk('div', 'lcff-retry', strings.retry || ''));
 		var retry = function () { enqueue(job); };
 		node.onclick = retry;
 		node.onkeydown = function (e) {
@@ -299,31 +390,58 @@
 		schedule(0);
 	}
 
+	/*
+	 * Without a delay: the cadence (3 s open and visible, 30 s otherwise),
+	 * doubled for every consecutive failed poll, at most POLL_MAX.
+	 */
 	function schedule(delay) {
-		if (pollTimer) { clearTimeout(pollTimer); }
+		if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
 		if (!started) { return; }
-		pollTimer = setTimeout(poll, delay === undefined ? (active() ? POLL_FAST : POLL_SLOW) : delay);
+		if (delay === undefined) {
+			delay = Math.min((active() ? POLL_FAST : POLL_SLOW) * Math.pow(2, failures), POLL_MAX);
+		}
+		pollTimer = setTimeout(poll, delay);
 	}
 
+	/*
+	 * After each 2xx the server says whether there is anything to wait for
+	 * (`conversation.poll`); polling stops when it says no, or when there is
+	 * no conversation. A send or opening the panel starts it again.
+	 */
 	function poll() {
 		pollTimer = null;
 		if (!started || polling) { return; }
 		if (!getToken()) { started = false; return; }
 		polling = true;
 		request('GET', '/messages?after=' + encodeURIComponent(lastId)).then(function (r) {
-			polling = false;
-			if (r.status === 401) {
-				store('lcff_token', null);
-				stopPolling();
-				return;
+			var keep = true;
+			try {
+				if (r.status === 401) {
+					dropToken();
+					keep = false;
+					return;
+				}
+				if (r.status < 200 || r.status > 299) {
+					failures = Math.min(failures + 1, 30);
+					return;
+				}
+				failures = 0;
+				var data = r.data || {};
+				keep = !!(data.conversation && data.conversation.poll !== false);
+				if (Array.isArray(data.messages)) {
+					handleMessages(data.messages);
+				}
+			} finally {
+				polling = false;
+				if (keep) { schedule(); } else { stopPolling(); }
 			}
-			if (r.status === 200 && r.data && Array.isArray(r.data.messages)) {
-				handleMessages(r.data.messages);
-			}
-			schedule();
 		}, function () {
+			// Network error or timeout.
 			polling = false;
+			failures = Math.min(failures + 1, 30);
 			schedule();
+		}).then(null, function () {
+			polling = false;
 		});
 	}
 
@@ -372,10 +490,12 @@
 		return max;
 	}
 
+	/* Never restarts a stopped poller; a running one polls at once when the tab
+	 * becomes visible, unless it is backing off. */
 	function onVisibility() {
-		if (!started) { return; }
 		if (active()) { markSeen(); }
-		schedule(visible() ? 0 : undefined);
+		if (!started) { return; }
+		schedule(visible() && !failures ? 0 : undefined);
 	}
 
 	/* ---- public API ---- */
@@ -385,6 +505,7 @@
 		el.panel.hidden = false;
 		el.panel.classList.add('lcff-panel--open');
 		markSeen();
+		// One poll right away; it keeps polling only if the server says so.
 		if (getToken() && !started) { startPolling(); } else if (started) { schedule(0); }
 		scrollDown();
 		el.input.focus();
