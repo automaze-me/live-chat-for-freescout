@@ -305,16 +305,20 @@ class LCFF_Settings {
 	}
 
 	/**
-	 * Sanitizes the submitted settings.
+	 * Sanitizes the submitted settings. Idempotent: on the first save, when
+	 * the option does not exist yet, WordPress runs this twice (update_option()
+	 * sanitizes, then add_option() sanitizes that result again, WP trac
+	 * #21989), so an already sanitized value must come back unchanged. The
+	 * input is already unslashed (options.php does that).
 	 *
-	 * @param mixed $input Raw input.
+	 * @param mixed $input Form input, or an already sanitized value.
 	 * @return array
 	 */
 	public static function sanitize( $input ) {
 		$input = is_array( $input ) ? $input : array();
 		$out   = self::get();
 
-		$url = isset( $input['freescout_url'] ) ? esc_url_raw( trim( wp_unslash( (string) $input['freescout_url'] ) ), array( 'http', 'https' ) ) : '';
+		$url = isset( $input['freescout_url'] ) ? esc_url_raw( trim( (string) $input['freescout_url'] ), array( 'http', 'https' ) ) : '';
 		$url = untrailingslashit( $url );
 		if ( '' === $url && ! empty( $input['freescout_url'] ) ) {
 			add_settings_error( self::OPTION, 'lcff_url', __( 'The FreeScout URL is not valid.', 'live-chat-for-freescout' ) );
@@ -322,7 +326,7 @@ class LCFF_Settings {
 			$out['freescout_url'] = $url;
 		}
 
-		$site_id = isset( $input['site_id'] ) ? strtolower( trim( sanitize_text_field( wp_unslash( (string) $input['site_id'] ) ) ) ) : '';
+		$site_id = isset( $input['site_id'] ) ? strtolower( trim( sanitize_text_field( (string) $input['site_id'] ) ) ) : '';
 		if ( '' === $site_id ) {
 			$out['site_id'] = '';
 		} elseif ( self::is_valid_site_id( $site_id ) ) {
@@ -331,7 +335,7 @@ class LCFF_Settings {
 			add_settings_error( self::OPTION, 'lcff_site_id', __( 'The Site ID must be 32 lowercase hexadecimal characters.', 'live-chat-for-freescout' ) );
 		}
 
-		$secret = isset( $input['secret'] ) ? trim( sanitize_text_field( wp_unslash( (string) $input['secret'] ) ) ) : '';
+		$secret = isset( $input['secret'] ) ? trim( sanitize_text_field( (string) $input['secret'] ) ) : '';
 		if ( '' !== $secret ) {
 			if ( self::is_valid_secret( $secret ) ) {
 				$out['secret'] = $secret;
@@ -351,15 +355,19 @@ class LCFF_Settings {
 
 	/**
 	 * Turns the submitted rows (open checkbox, from, to; Monday first) into
-	 * the list form sanitize_hours() takes.
+	 * the list form sanitize_hours() takes. A row already in that form (a
+	 * two-element list, or null) passes through, so a second sanitize pass
+	 * keeps the hours (see sanitize()).
 	 *
-	 * @param array $rows Form rows.
+	 * @param array $rows Form rows, or sanitized entries.
 	 * @return array
 	 */
 	public static function hours_from_form( array $rows ) {
 		$list = array();
 		foreach ( array_values( $rows ) as $row ) {
-			if ( is_array( $row ) && ! empty( $row['open'] ) ) {
+			if ( is_array( $row ) && array( 0, 1 ) === array_keys( $row ) ) {
+				$list[] = array( $row[0], $row[1] );
+			} elseif ( is_array( $row ) && ! empty( $row['open'] ) ) {
 				$list[] = array(
 					isset( $row['from'] ) ? (string) $row['from'] : '',
 					isset( $row['to'] ) ? (string) $row['to'] : '',

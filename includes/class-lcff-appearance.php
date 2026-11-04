@@ -20,20 +20,24 @@ class LCFF_Appearance {
 	 * Sanitizes the appearance keys present in $input. Absent keys stay absent
 	 * so the caller keeps their previous values.
 	 *
-	 * @param array $input Raw (slashed) form input.
+	 * The input is already unslashed: options.php unslashes the form before
+	 * update_option() runs the sanitize callback. Unslashing again would drop
+	 * every backslash, and on a first save WordPress sanitizes twice.
+	 *
+	 * @param array $input Form input (unslashed), or an already sanitized value.
 	 * @return array
 	 */
 	public static function sanitize( array $input ) {
 		$out = array();
 
 		if ( isset( $input['team_name'] ) ) {
-			$out['team_name'] = self::cut( sanitize_text_field( wp_unslash( (string) $input['team_name'] ) ), 60 );
+			$out['team_name'] = self::cut( sanitize_text_field( (string) $input['team_name'] ), 60 );
 		}
 		if ( isset( $input['avatar_id'] ) ) {
 			$out['avatar_id'] = absint( $input['avatar_id'] );
 		}
 		if ( isset( $input['accent'] ) ) {
-			$accent         = strtolower( trim( sanitize_text_field( wp_unslash( (string) $input['accent'] ) ) ) );
+			$accent         = strtolower( trim( sanitize_text_field( (string) $input['accent'] ) ) );
 			$out['accent'] = 1 === preg_match( '/^#[0-9a-f]{6}$/', $accent ) ? $accent : self::DEFAULT_ACCENT;
 		}
 		if ( isset( $input['position'] ) ) {
@@ -41,14 +45,14 @@ class LCFF_Appearance {
 		}
 		foreach ( array( 'welcome', 'welcome_away' ) as $key ) {
 			if ( isset( $input[ $key ] ) ) {
-				$out[ $key ] = self::cut( sanitize_textarea_field( wp_unslash( (string) $input[ $key ] ) ), 500 );
+				$out[ $key ] = self::cut( sanitize_textarea_field( (string) $input[ $key ] ), 500 );
 			}
 		}
 		if ( isset( $input['hidden_paths'] ) ) {
-			$out['hidden_paths'] = self::normalize_paths( wp_unslash( (string) $input['hidden_paths'] ) );
+			$out['hidden_paths'] = self::normalize_paths( (string) $input['hidden_paths'] );
 		}
 		if ( isset( $input['privacy_url'] ) ) {
-			$out['privacy_url'] = esc_url_raw( trim( wp_unslash( (string) $input['privacy_url'] ) ), array( 'http', 'https' ) );
+			$out['privacy_url'] = esc_url_raw( trim( (string) $input['privacy_url'] ), array( 'http', 'https' ) );
 		}
 
 		return $out;
