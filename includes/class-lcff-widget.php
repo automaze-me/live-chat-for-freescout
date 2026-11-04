@@ -67,6 +67,7 @@ class LCFF_Widget {
 				'askLabelEmail'   => __( 'Email', 'live-chat-for-freescout' ),
 				'askOk'           => __( 'OK', 'live-chat-for-freescout' ),
 				'askLater'        => __( 'Not now', 'live-chat-for-freescout' ),
+				'askAway'         => __( 'Where should we send the answer?', 'live-chat-for-freescout' ),
 				'askThanks'       => __( 'Thanks!', 'live-chat-for-freescout' ),
 				'askEmailOnly'    => __( 'Could you leave your email address? Then we can send you the answer.', 'live-chat-for-freescout' ),
 				'askInvalid'      => __( 'Please enter a valid email address.', 'live-chat-for-freescout' ),

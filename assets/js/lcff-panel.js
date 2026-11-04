@@ -925,7 +925,7 @@
 		for (var i = 0; i < kids.length; i++) {
 			if (kids[i] !== el.welcome) { el.list.removeChild(kids[i]); }
 		}
-		askCard = null;
+		removeAsk(); // an away form lives outside the list
 		noticeEl = null;
 		continueCard = null;
 	}
@@ -1175,6 +1175,16 @@
 	function removeAsk() {
 		if (askCard && askCard.parentNode) { askCard.parentNode.removeChild(askCard); }
 		askCard = null;
+		if (built && el.form) { el.form.hidden = false; } // the message box is back
+	}
+
+	/* Only a known "closed" turns the composer into the ask; unknown counts as open. */
+	function shopClosed() {
+		if (!cfg.hours || !window.LCFF_HOURS) { return false; }
+		try {
+			var st = window.LCFF_HOURS.state(cfg.hours, Date.now());
+			return !!st && st.open === false;
+		} catch (e) { return false; }
 	}
 
 	/*
@@ -1191,10 +1201,14 @@
 		var show = a.n === 0 || (a.n === 1 && a.m >= 2);
 		if (show) { a.n++; a.m = 0; }
 		writeAsk(a);
-		if (show) { showAsk(node, key, a.e === 1); }
+		if (show) { showAsk(node, key, a.e === 1, shopClosed()); }
 	}
 
-	function showAsk(after, key, emailOnly) {
+	/*
+	 * `away`: the shop is closed, so the form replaces the message box instead
+	 * of joining the conversation. Both share this one submit and thanks path.
+	 */
+	function showAsk(after, key, emailOnly, away) {
 		removeAsk();
 		var myGen = gen;
 		var canOrder = !!cfg.woo && !emailOnly && identityOn();
@@ -1202,8 +1216,12 @@
 
 		var card = mk('form', 'lcff-ask');
 		card.noValidate = true;
-		card.appendChild(mk('div', 'lcff-ask-intro', canOrder ? (strings.askIntro || '') : (strings.askEmailOnly || '')));
-		var label = mk('label', 'lcff-ask-label', canOrder ? (strings.askLabel || '') : (strings.askLabelEmail || ''));
+		if (away) {
+			card.className = 'lcff-ask lcff-ask-away';
+		} else {
+			card.appendChild(mk('div', 'lcff-ask-intro', canOrder ? (strings.askIntro || '') : (strings.askEmailOnly || '')));
+		}
+		var label = mk('label', 'lcff-ask-label', away ? (strings.askAway || '') : (canOrder ? (strings.askLabel || '') : (strings.askLabelEmail || '')));
 		label.setAttribute('for', id);
 		card.appendChild(label);
 		var input = mk('input', 'lcff-ask-input');
@@ -1237,6 +1255,16 @@
 		var busy = false;
 		var thanks = function () {
 			if (askCard !== card) { return; }
+			if (away) {
+				// The box comes back; the thanks stays in the conversation.
+				removeAsk();
+				var done = mk('div', 'lcff-ask lcff-ask--done', '');
+				done.appendChild(mk('div', 'lcff-ask-thanks', strings.askThanks || ''));
+				el.list.appendChild(done);
+				askCard = done;
+				scrollDown();
+				return;
+			}
 			while (card.firstChild) { card.removeChild(card.firstChild); }
 			card.className = 'lcff-ask lcff-ask--done';
 			card.appendChild(mk('div', 'lcff-ask-thanks', strings.askThanks || ''));
@@ -1313,7 +1341,11 @@
 			}).then(null, function () {});
 		});
 
-		if (after && after.parentNode === el.list) {
+		if (away) {
+			el.form.hidden = true;
+			el.panel.appendChild(card);
+			input.focus();
+		} else if (after && after.parentNode === el.list) {
 			el.list.insertBefore(card, after.nextSibling);
 		} else {
 			el.list.appendChild(card);

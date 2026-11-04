@@ -237,6 +237,17 @@
 	font-size: 14px;
 }
 
+.lcff-form[hidden] {
+	display: none;
+}
+
+.lcff-ask-away {
+	align-self: auto;
+	border-radius: 0;
+	border-width: 1px 0 0;
+	border-color: #dcdcde;
+}
+
 .lcff-ask-label {
 	font-weight: 600;
 }
