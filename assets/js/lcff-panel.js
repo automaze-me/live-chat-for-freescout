@@ -69,6 +69,7 @@
 	var askCard = null;        // the email / order-number card on screen, if any
 	var askSeq = 0;
 	var noticeEl = null;       // the one .lcff-notice at the end of the list, if any
+	var pendingContinue = null; // the link the visitor opened; forget() keeps it
 	var continueCard = null;   // the continue-link prompt on screen, if any
 
 	function visible() { return document.visibilityState === 'visible'; }
@@ -756,6 +757,7 @@
 		confirmLogout = false;
 		queue.length = 0;
 		clearView();
+		renderContinue(); // the link is not account content: the prompt comes back
 	}
 
 	/*
@@ -841,6 +843,7 @@
 		var finish = function () {
 			checking = false;
 			releaseList();
+			renderContinue();
 		};
 		identityRound(true).then(finish, finish);
 	}
@@ -1157,6 +1160,8 @@
 				store('lcff_seen', null);
 				store('lcff_ask', null);
 				clearView();
+				// A redemption never logs out: the token just stored must stay.
+				confirmLogout = false;
 				noteIdentity(r.data.identity);
 				kick();
 				return 'ok';
@@ -1187,7 +1192,18 @@
 	 */
 	function continueChat(link) {
 		if (typeof link !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(link)) { return; }
+		pendingContinue = link;
 		open();
+		renderContinue();
+	}
+
+	/*
+	 * Shows the prompt for `pendingContinue`, but not while the panel-open
+	 * identity check runs (it may forget everything; finish() renders after).
+	 */
+	function renderContinue() {
+		if (!pendingContinue || !built || checking) { return; }
+		var link = pendingContinue;
 		if (continueCard && continueCard.parentNode) { continueCard.parentNode.removeChild(continueCard); }
 		var card = mk('div', 'lcff-ask lcff-continue');
 		card.appendChild(mk('div', 'lcff-ask-intro', strings.continuePrompt || ''));
@@ -1207,6 +1223,7 @@
 			go.disabled = true;
 			failed.hidden = true;
 			redeem(link, false).then(function (outcome) {
+				if (outcome === 'ok' || outcome === 'invalid') { pendingContinue = null; }
 				if (outcome === 'ok') { return; } // clearView() removed the card
 				busy = false;
 				failed.hidden = false;
