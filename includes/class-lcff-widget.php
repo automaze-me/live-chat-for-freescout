@@ -20,7 +20,17 @@ class LCFF_Widget {
 			return;
 		}
 
-		$s        = LCFF_Settings::get();
+		$s = LCFF_Settings::get();
+
+		// Decided per request path on the server, so a full-page cache (which keys on the URL) stays correct.
+		$request_path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH ) : '/';
+		if ( '' === $request_path ) {
+			$request_path = '/';
+		}
+		if ( LCFF_Appearance::is_hidden( rawurldecode( $request_path ), $s['hidden_paths'] ) ) {
+			return;
+		}
+
 		$api_base = $s['freescout_url'] . '/wordpress-chat/api/v1/sites/' . $s['site_id'];
 
 		wp_enqueue_style( 'lcff-widget', LCFF_PLUGIN_URL . 'assets/css/lcff-widget.css', array(), LCFF_VERSION );
@@ -36,16 +46,16 @@ class LCFF_Widget {
 		);
 
 		$identity = LCFF_Settings::identity_enabled();
-		$config   = array(
+		$config   = array_merge(
+			LCFF_Appearance::config( $s ),
+			array(
 			'apiBase'    => $api_base,
 			'panelUrl'   => LCFF_PLUGIN_URL . 'assets/js/lcff-panel.js?ver=' . LCFF_VERSION,
 			'identity'   => $identity,
 			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 			'woo'        => $identity && function_exists( 'wc_get_order' ),
-			'privacyUrl' => (string) get_privacy_policy_url(),
 			'strings'  => array(
 				'title'       => __( 'Chat with us', 'live-chat-for-freescout' ),
-				'welcome'     => __( 'Hi! How can we help?', 'live-chat-for-freescout' ),
 				'placeholder' => __( 'Type a message…', 'live-chat-for-freescout' ),
 				'send'        => __( 'Send', 'live-chat-for-freescout' ),
 				'close'       => __( 'Close chat', 'live-chat-for-freescout' ),
@@ -67,6 +77,7 @@ class LCFF_Widget {
 				'continueFailed'  => __( 'This link has expired or was already used.', 'live-chat-for-freescout' ),
 				'viaEmail'        => __( 'via email', 'live-chat-for-freescout' ),
 			),
+			)
 		);
 
 		wp_add_inline_script( 'lcff-loader', 'window.LCFF_CONFIG = ' . wp_json_encode( $config ) . ';', 'before' );

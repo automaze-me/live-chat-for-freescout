@@ -175,11 +175,26 @@
 
 		el.panel = mk('div', 'lcff-panel');
 		el.panel.setAttribute('role', 'dialog');
-		el.panel.setAttribute('aria-label', strings.title || 'Chat');
+		var teamName = cfg.teamName || strings.title || '';
+		el.panel.setAttribute('aria-label', teamName || 'Chat');
 		el.panel.hidden = true;
+		if (/^#[0-9a-f]{6}$/i.test(cfg.accent || '')) {
+			el.panel.style.setProperty('--lcff-accent', cfg.accent);
+		}
+		if (cfg.position === 'left') {
+			el.panel.classList.add('lcff-left');
+		}
 
 		var header = mk('div', 'lcff-header');
-		header.appendChild(mk('div', 'lcff-title', strings.title || ''));
+		var who = mk('div', 'lcff-who');
+		if (/^https?:\/\//i.test(cfg.avatarUrl || '')) {
+			var avatar = mk('img', 'lcff-header-avatar');
+			avatar.src = cfg.avatarUrl;
+			avatar.alt = '';
+			who.appendChild(avatar);
+		}
+		who.appendChild(mk('div', 'lcff-title', teamName));
+		header.appendChild(who);
 		el.close = mk('button', 'lcff-close', '×');
 		el.close.type = 'button';
 		el.close.setAttribute('aria-label', strings.close || 'Close');
@@ -189,7 +204,7 @@
 
 		el.list = mk('div', 'lcff-messages');
 		el.list.setAttribute('aria-live', 'polite');
-		el.welcome = mk('div', 'lcff-welcome', strings.welcome || '');
+		el.welcome = mk('div', 'lcff-welcome', cfg.welcome || strings.welcome || '');
 		el.list.appendChild(el.welcome);
 		el.panel.appendChild(el.list);
 

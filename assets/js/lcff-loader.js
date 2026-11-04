@@ -81,7 +81,13 @@
 	var bubble = document.createElement('button');
 	bubble.type = 'button';
 	bubble.className = 'lcff-bubble';
-	bubble.setAttribute('aria-label', strings.title || 'Chat');
+	bubble.setAttribute('aria-label', cfg.teamName || strings.title || 'Chat');
+	if (/^#[0-9a-f]{6}$/i.test(cfg.accent || '')) {
+		bubble.style.setProperty('--lcff-accent', cfg.accent);
+	}
+	if (cfg.position === 'left') {
+		bubble.classList.add('lcff-left');
+	}
 
 	var icon = document.createElement('span');
 	icon.className = 'lcff-bubble-icon';

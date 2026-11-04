@@ -18,6 +18,7 @@ class LCFF_Settings {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register' ) );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'admin_assets' ) );
 	}
 
 	/**
@@ -35,6 +36,14 @@ class LCFF_Settings {
 				'freescout_url' => '',
 				'site_id'       => '',
 				'secret'        => '',
+				'team_name'     => '',
+				'avatar_id'     => 0,
+				'accent'        => LCFF_Appearance::DEFAULT_ACCENT,
+				'position'      => 'right',
+				'welcome'       => '',
+				'welcome_away'  => '',
+				'hidden_paths'  => '',
+				'privacy_url'   => '',
 			),
 			$stored
 		);
@@ -75,6 +84,28 @@ class LCFF_Settings {
 			'manage_options',
 			self::PAGE,
 			array( __CLASS__, 'render_page' )
+		);
+	}
+
+	/**
+	 * Media modal and color picker, on this settings page only.
+	 *
+	 * @param string $hook Admin page hook suffix.
+	 */
+	public static function admin_assets( $hook ) {
+		if ( 'settings_page_' . self::PAGE !== $hook ) {
+			return;
+		}
+		wp_enqueue_media();
+		wp_enqueue_style( 'wp-color-picker' );
+		wp_enqueue_script( 'lcff-admin', LCFF_PLUGIN_URL . 'assets/js/lcff-admin.js', array( 'wp-color-picker' ), LCFF_VERSION, true );
+		wp_localize_script(
+			'lcff-admin',
+			'LCFF_ADMIN',
+			array(
+				'chooseTitle'  => __( 'Choose an avatar', 'live-chat-for-freescout' ),
+				'chooseButton' => __( 'Use this image', 'live-chat-for-freescout' ),
+			)
 		);
 	}
 
@@ -137,6 +168,103 @@ class LCFF_Settings {
 				'description' => __( 'The 43-character site secret from FreeScout. It lets logged-in visitors and order numbers be recognized. Leave blank to keep the saved value.', 'live-chat-for-freescout' ),
 			)
 		);
+
+		add_settings_section(
+			'lcff_appearance',
+			__( 'Appearance', 'live-chat-for-freescout' ),
+			'__return_empty_string',
+			self::PAGE
+		);
+
+		$fields = array(
+			array( 'team_name', __( 'Team name', 'live-chat-for-freescout' ), 'text', '' ),
+			array( 'avatar_id', __( 'Avatar', 'live-chat-for-freescout' ), 'avatar', '' ),
+			array( 'accent', __( 'Accent color', 'live-chat-for-freescout' ), 'accent', '' ),
+			array( 'position', __( 'Position', 'live-chat-for-freescout' ), 'position', '' ),
+			array( 'welcome', __( 'Welcome message', 'live-chat-for-freescout' ), 'textarea', '' ),
+			array( 'welcome_away', __( 'Welcome message (away)', 'live-chat-for-freescout' ), 'textarea', '' ),
+			array( 'hidden_paths', __( 'Hide on pages', 'live-chat-for-freescout' ), 'textarea', __( 'One path per line, e.g. /checkout/. A line ending in * hides the chat on every page below it.', 'live-chat-for-freescout' ) ),
+			array( 'privacy_url', __( 'Privacy policy link', 'live-chat-for-freescout' ), 'url', __( 'Leave empty to use the WordPress privacy page.', 'live-chat-for-freescout' ) ),
+		);
+		foreach ( $fields as $f ) {
+			add_settings_field(
+				$f[0],
+				$f[1],
+				array( __CLASS__, 'render_appearance_field' ),
+				self::PAGE,
+				'lcff_appearance',
+				array(
+					'key'         => $f[0],
+					'type'        => $f[2],
+					'description' => $f[3],
+					'label_for'   => 'lcff_' . $f[0],
+				)
+			);
+		}
+	}
+
+	/**
+	 * Renders one appearance field.
+	 *
+	 * @param array $args Field args.
+	 */
+	public static function render_appearance_field( $args ) {
+		$s    = self::get();
+		$key  = $args['key'];
+		$name = self::OPTION . '[' . $key . ']';
+		$id   = 'lcff_' . $key;
+		$val  = isset( $s[ $key ] ) ? $s[ $key ] : '';
+
+		switch ( $args['type'] ) {
+			case 'avatar':
+				$url = $val ? wp_get_attachment_image_url( (int) $val, 'thumbnail' ) : '';
+				printf( '<input type="hidden" id="%1$s" name="%2$s" value="%3$s" />', esc_attr( $id ), esc_attr( $name ), esc_attr( (int) $val ) );
+				printf(
+					'<p><img id="lcff_avatar_preview" src="%1$s" alt="" style="width:64px;height:64px;border-radius:50%%;object-fit:cover;%2$s" /></p>',
+					esc_url( (string) $url ),
+					$url ? '' : 'display:none;'
+				);
+				echo '<button type="button" class="button" id="lcff_avatar_choose">' . esc_html__( 'Choose an avatar', 'live-chat-for-freescout' ) . '</button> ';
+				echo '<button type="button" class="button-link" id="lcff_avatar_remove"' . ( $url ? '' : ' style="display:none;"' ) . '>' . esc_html__( 'Remove', 'live-chat-for-freescout' ) . '</button>';
+				break;
+			case 'accent':
+				printf(
+					'<input type="text" id="%1$s" name="%2$s" value="%3$s" class="lcff-color-field" data-default-color="%4$s" />',
+					esc_attr( $id ),
+					esc_attr( $name ),
+					esc_attr( $val ),
+					esc_attr( LCFF_Appearance::DEFAULT_ACCENT )
+				);
+				break;
+			case 'position':
+				printf( '<select id="%1$s" name="%2$s">', esc_attr( $id ), esc_attr( $name ) );
+				printf( '<option value="right"%1$s>%2$s</option>', selected( $val, 'right', false ), esc_html__( 'Bottom right', 'live-chat-for-freescout' ) );
+				printf( '<option value="left"%1$s>%2$s</option>', selected( $val, 'left', false ), esc_html__( 'Bottom left', 'live-chat-for-freescout' ) );
+				echo '</select>';
+				break;
+			case 'textarea':
+				printf(
+					'<textarea id="%1$s" name="%2$s" rows="%3$d" class="large-text code" %4$s>%5$s</textarea>',
+					esc_attr( $id ),
+					esc_attr( $name ),
+					'hidden_paths' === $key ? 4 : 2,
+					'hidden_paths' === $key ? '' : 'maxlength="500"',
+					esc_textarea( $val )
+				);
+				break;
+			default:
+				printf(
+					'<input type="%1$s" id="%2$s" name="%3$s" value="%4$s" class="regular-text" %5$s />',
+					esc_attr( $args['type'] ),
+					esc_attr( $id ),
+					esc_attr( $name ),
+					esc_attr( $val ),
+					'team_name' === $key ? 'maxlength="60"' : ''
+				);
+		}
+		if ( ! empty( $args['description'] ) ) {
+			echo '<p class="description">' . esc_html( $args['description'] ) . '</p>';
+		}
 	}
 
 	/**
@@ -175,7 +303,7 @@ class LCFF_Settings {
 			}
 		}
 
-		return $out;
+		return array_merge( $out, LCFF_Appearance::sanitize( $input ) );
 	}
 
 	public static function render_field( $args ) {
