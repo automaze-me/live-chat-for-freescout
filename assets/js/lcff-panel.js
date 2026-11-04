@@ -54,6 +54,7 @@
 	var unseenAgentIds = [];  // agent ids rendered while active, not yet queued
 	var pendingSeen = {};     // id -> true: queued for /seen until the server accepts or refuses them
 	var seenInFlight = false; // a /seen request is running
+	var seenSeq = 0;          // bumped per /seen request and when receipts are discarded; older answers are ignored
 	var unread = 0;
 	var pollTimer = null;
 	var polling = false;
@@ -620,6 +621,8 @@
 	 * 100 ids go out per request, the server's cap.
 	 */
 	function markSeen() {
+		// Seen means: panel open, tab visible, list released (spec 7).
+		if (!active() || held) { return; }
 		if (unread) { setUnread(0); }
 		if (lastAgentId() > 0) { store('lcff_seen', String(lastAgentId())); }
 		unseenAgentIds.forEach(function (id) { pendingSeen[id] = true; });
@@ -627,10 +630,10 @@
 		if (seenInFlight || !getToken()) { return; }
 		var ids = Object.keys(pendingSeen).map(Number).sort(function (a, b) { return a - b; }).slice(0, 100);
 		if (!ids.length) { return; }
-		var myGen = gen;
+		var mySeq = ++seenSeq;
 		seenInFlight = true;
 		request('POST', '/seen', { message_ids: ids }).then(function (r) {
-			if (myGen !== gen) { return; } // forgotten meanwhile; clearView() reset the flag
+			if (mySeq !== seenSeq) { return; } // discarded meanwhile (forget, logout, dropped token)
 			seenInFlight = false;
 			if (r.status === 204 || r.status === 422) {
 				ids.forEach(function (id) { delete pendingSeen[id]; });
@@ -639,7 +642,7 @@
 				unauthorized(r.token);
 			}
 		}, function () {
-			if (myGen === gen) { seenInFlight = false; }
+			if (mySeq === seenSeq) { seenInFlight = false; }
 		});
 	}
 
@@ -788,16 +791,23 @@
 		store('lcff_acct', null);
 		pendingToken = null;
 		lastIdentity = null;
+		// Receipts seen under a rejected token can never be accepted for another.
+		discardSeen();
 		stopPolling();
 		return true;
+	}
+
+	function discardSeen() {
+		pendingSeen = {};
+		unseenAgentIds = [];
+		seenInFlight = false;
+		seenSeq++;
 	}
 
 	/* Empties the message list; the next session starts from nothing. */
 	function clearView() {
 		rendered = {};
-		pendingSeen = {};
-		seenInFlight = false;
-		unseenAgentIds = [];
+		discardSeen();
 		lastId = 0;
 		initialDone = false;
 		if (unread) { setUnread(0); }
