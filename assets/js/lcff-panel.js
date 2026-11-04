@@ -1173,9 +1173,11 @@
 	}
 
 	function removeAsk() {
+		var wasAway = !!askCard && askCard.className.indexOf('lcff-ask-away') !== -1;
 		if (askCard && askCard.parentNode) { askCard.parentNode.removeChild(askCard); }
 		askCard = null;
 		if (built && el.form) { el.form.hidden = false; } // the message box is back
+		if (wasAway && isOpen && el.input) { el.input.focus(); } // the focused button is gone
 	}
 
 	/* Only a known "closed" turns the composer into the ask; unknown counts as open. */
@@ -1229,6 +1231,7 @@
 		input.type = canOrder ? 'text' : 'email';
 		input.maxLength = 254;
 		input.autocomplete = canOrder ? 'off' : 'email';
+		if (away) { input.placeholder = canOrder ? (strings.askLabel || '') : (strings.askLabelEmail || ''); }
 		card.appendChild(input);
 		var error = mk('div', 'lcff-ask-error');
 		error.setAttribute('role', 'alert');
