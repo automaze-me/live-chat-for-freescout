@@ -63,6 +63,11 @@
 	var failures = 0;       // consecutive failed polls, for the backoff
 	var initialDone = false;
 	var el = {};
+	var ATTACH_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+	var attachMb = 0;          // limits.attachment_mb from the latest answer; 0: not known yet (the server decides)
+	var blobUrls = [];         // every blob URL this widget made; revoked in clearView()
+	var fileErrorTimer = null;
+	var viewEpoch = 0;         // bumped by clearView(): a blob fetched for an older view is dropped
 
 	/* ---- identity state ---- */
 	var lastIdentity = null;   // {level, account} from the latest send, poll or identity answer
@@ -117,6 +122,22 @@
 	 * `token` defaults to the stored token; null sends none.
 	 */
 	function request(method, path, body, token) {
+		return rawRequest(method, path, body, token, false);
+	}
+
+	/* Like request(), with a FormData body and no Content-Type (the browser adds the boundary). */
+	function requestForm(method, path, form, token) {
+		return rawRequest(method, path, form, token, true);
+	}
+
+	/* Remembers the size limit the server last announced. */
+	function noteLimits(data) {
+		if (data && data.limits && typeof data.limits.attachment_mb === 'number') {
+			attachMb = data.limits.attachment_mb;
+		}
+	}
+
+	function rawRequest(method, path, body, token, isForm) {
 		var timer = null;
 		function clear() {
 			if (timer) { clearTimeout(timer); timer = null; }
@@ -127,8 +148,12 @@
 			if (token) { headers['X-Chat-Token'] = token; }
 			var init = { method: method, headers: headers, mode: 'cors', credentials: 'omit' };
 			if (body !== undefined) {
-				headers['Content-Type'] = 'application/json';
-				init.body = JSON.stringify(body);
+				if (isForm) {
+					init.body = body;
+				} else {
+					headers['Content-Type'] = 'application/json';
+					init.body = JSON.stringify(body);
+				}
 			}
 			try {
 				if (typeof window.AbortController === 'function') {
@@ -142,6 +167,7 @@
 					clear();
 					var data = null;
 					try { data = t ? JSON.parse(t) : null; } catch (e2) {}
+					noteLimits(data);
 					return { status: res.status, data: data, hadToken: !!token, token: token || null };
 				});
 			}).then(null, function (err) {
@@ -280,12 +306,37 @@
 		});
 		el.send = mk('button', 'lcff-send', strings.send || 'Send');
 		el.send.type = 'submit';
+		el.attach = mk('button', 'lcff-attach');
+		el.attach.type = 'button';
+		el.attach.setAttribute('aria-label', strings.attach || 'Attach a file');
+		el.attach.title = strings.attach || 'Attach a file';
+		el.attach.appendChild(clipIcon());
+		el.file = document.createElement('input');
+		el.file.type = 'file';
+		el.file.accept = ATTACH_TYPES.join(',');
+		el.file.hidden = true;
+		el.file.tabIndex = -1;
+		el.file.setAttribute('aria-hidden', 'true');
+		el.attach.addEventListener('click', function () {
+			if (!held) { el.file.click(); }
+		});
+		el.file.addEventListener('change', function () {
+			var f = el.file.files && el.file.files[0];
+			el.file.value = '';
+			if (f) { submitFile(f); }
+		});
+		el.fileError = mk('div', 'lcff-file-error');
+		el.fileError.setAttribute('role', 'alert');
+		el.fileError.hidden = true;
+		el.form.appendChild(el.attach);
+		el.form.appendChild(el.file);
 		el.form.appendChild(el.input);
 		el.form.appendChild(el.send);
 		el.form.addEventListener('submit', function (e) {
 			e.preventDefault();
 			submit();
 		});
+		el.panel.appendChild(el.fileError);
 		el.panel.appendChild(el.form);
 
 		el.panel.addEventListener('keydown', function (e) {
@@ -323,13 +374,145 @@
 			}
 			n.appendChild(head);
 		}
-		n.appendChild(mk('div', 'lcff-text', String(m.text)));
+		var atts = m.attachments && m.attachments.length ? m.attachments : [];
+		if (String(m.text) !== '' || !atts.length) {
+			n.appendChild(mk('div', 'lcff-text', String(m.text)));
+		}
+		renderAttachments(n, atts);
 		if (m.via === 'email') {
 			n.appendChild(mk('div', 'lcff-via', strings.viaEmail || ''));
 		}
 		rendered[m.id] = n;
 		el.list.appendChild(n);
 		return n;
+	}
+
+	/* ---- attachments ---- */
+	function clipIcon() {
+		var ns = 'http://www.w3.org/2000/svg';
+		var svg = document.createElementNS(ns, 'svg');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('aria-hidden', 'true');
+		svg.setAttribute('focusable', 'false');
+		var path = document.createElementNS(ns, 'path');
+		path.setAttribute('d', 'M21.4 11.1l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8');
+		path.setAttribute('fill', 'none');
+		path.setAttribute('stroke', 'currentColor');
+		path.setAttribute('stroke-width', '2');
+		path.setAttribute('stroke-linecap', 'round');
+		path.setAttribute('stroke-linejoin', 'round');
+		svg.appendChild(path);
+		return svg;
+	}
+
+	function isImage(mime) { return /^image\/(jpeg|png|gif|webp)$/.test(String(mime || '')); }
+
+	/* Fetches an attachment with the chat token; resolves to a blob URL, or rejects. */
+	function loadAttachment(id) {
+		var myEpoch = viewEpoch;
+		var t = getToken();
+		var headers = {};
+		if (t) { headers['X-Chat-Token'] = t; }
+		var init = { method: 'GET', headers: headers, mode: 'cors', credentials: 'omit' };
+		var timer = null;
+		try {
+			if (typeof window.AbortController === 'function') {
+				var ctrl = new window.AbortController();
+				init.signal = ctrl.signal;
+				timer = setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT);
+			}
+		} catch (e) {}
+		return fetch(API + '/attachments/' + encodeURIComponent(id), init).then(function (res) {
+			if (!res.ok) { throw new Error('lcff: attachment ' + res.status); }
+			return res.blob();
+		}).then(function (blob) {
+			if (timer) { clearTimeout(timer); }
+			if (myEpoch !== viewEpoch) { throw new Error('lcff: view cleared'); }
+			var url = window.URL.createObjectURL(blob);
+			blobUrls.push(url);
+			return url;
+		}, function (err) {
+			if (timer) { clearTimeout(timer); }
+			throw err;
+		});
+	}
+
+	function revokeBlobUrls() {
+		for (var i = 0; i < blobUrls.length; i++) {
+			try { window.URL.revokeObjectURL(blobUrls[i]); } catch (e) {}
+		}
+		blobUrls = [];
+	}
+
+	function revokeNow(url) {
+		var i = blobUrls.indexOf(url);
+		if (i !== -1) { blobUrls.splice(i, 1); }
+		try { window.URL.revokeObjectURL(url); } catch (e) {}
+	}
+
+	/* A saved file: a PDF or any other non-image type. Never opened in a tab, since a blob URL has the shop's origin. */
+	function downloadAttachment(a, link) {
+		link.classList.add('lcff-att--busy');
+		loadAttachment(a.id).then(function (url) {
+			link.classList.remove('lcff-att--busy');
+			var dl = document.createElement('a');
+			dl.href = url;
+			dl.download = String(a.name || 'file');
+			dl.rel = 'noopener';
+			dl.style.display = 'none';
+			document.body.appendChild(dl);
+			dl.click();
+			document.body.removeChild(dl);
+			setTimeout(function () { revokeNow(url); }, 10000);
+		}, function () {
+			link.classList.remove('lcff-att--busy');
+			link.classList.add('lcff-att--failed');
+		});
+	}
+
+	function renderAttachments(node, atts) {
+		for (var i = 0; i < atts.length; i++) {
+			(function (a) {
+				if (!a || typeof a.id !== 'number') { return; }
+				var name = String(a.name || '');
+				var wrap = mk('div', 'lcff-att');
+				if (isImage(a.mime)) {
+					var open = mk('a', 'lcff-att-img');
+					open.href = '#';
+					open.setAttribute('role', 'button');
+					open.setAttribute('aria-label', name);
+					var img = document.createElement('img');
+					img.className = 'lcff-att-thumb';
+					img.alt = name;
+					open.appendChild(img);
+					var shown = null;
+					open.addEventListener('click', function (e) {
+						e.preventDefault();
+						if (shown) { window.open(shown, '_blank', 'noopener'); }
+					});
+					wrap.appendChild(open);
+					loadAttachment(a.id).then(function (url) {
+						shown = url;
+						img.src = url;
+					}, function () {
+						wrap.removeChild(open);
+						wrap.appendChild(mk('span', 'lcff-att-name', name));
+					});
+				} else {
+					var link = mk('a', 'lcff-att-file', name);
+					link.href = '#';
+					link.setAttribute('role', 'button');
+					link.addEventListener('click', function (e) {
+						e.preventDefault();
+						downloadAttachment(a, link);
+					});
+					wrap.appendChild(link);
+				}
+				node.appendChild(wrap);
+			})(atts[i]);
+		}
 	}
 
 	/*
@@ -359,11 +542,12 @@
 		}
 	}
 
-	function addPending(text, clientId) {
+	function addPending(text, clientId, file) {
 		var n = mk('div', 'lcff-message lcff-message--visitor lcff-message--sending');
 		n.setAttribute('data-role', 'visitor');
 		n.setAttribute('data-client-id', clientId);
-		n.appendChild(mk('div', 'lcff-text', text));
+		if (text) { n.appendChild(mk('div', 'lcff-text', text)); }
+		if (file) { n.appendChild(mk('div', 'lcff-att-pending', String(file.name || ''))); }
 		el.list.appendChild(n);
 		keepNoticeLast();
 		scrollDown();
@@ -381,6 +565,40 @@
 		var clientId = uuid();
 		var node = addPending(text, clientId);
 		enqueue({ node: node, text: text, clientId: clientId });
+		el.input.focus();
+	}
+
+	function showFileError(text) {
+		if (!el.fileError) { return; }
+		el.fileError.textContent = text;
+		el.fileError.hidden = !text;
+		if (fileErrorTimer) { clearTimeout(fileErrorTimer); fileErrorTimer = null; }
+		if (text) { fileErrorTimer = setTimeout(function () { showFileError(''); }, 8000); }
+	}
+
+	function tooLargeText() {
+		var t = strings.fileTooLarge || '';
+		return attachMb > 0 ? t.replace('{mb}', String(attachMb)) : t.replace(/\s*\(max \{mb\} MB\)/, '').replace('{mb}', '');
+	}
+
+	/* A chosen file goes out at once, as its own message, with the text typed so far. */
+	function submitFile(file) {
+		if (held) { return; }
+		showFileError('');
+		if (ATTACH_TYPES.indexOf(String(file.type || '').toLowerCase()) === -1) {
+			showFileError(strings.fileType || '');
+			return;
+		}
+		if (attachMb > 0 && file.size > attachMb * 1024 * 1024) {
+			showFileError(tooLargeText());
+			return;
+		}
+		var text = el.input.value.trim();
+		if (text.length > 5000) { text = text.slice(0, 5000); }
+		el.input.value = '';
+		var clientId = uuid();
+		var node = addPending(text, clientId, file);
+		enqueue({ node: node, text: text, clientId: clientId, file: file });
 		el.input.focus();
 	}
 
@@ -478,6 +696,14 @@
 			if (held) { return dispatch(job); }
 			job.acct = p.acct;
 			job.login = !!p.body.login_token;
+			if (job.file) {
+				var form = new window.FormData();
+				for (var k in p.body) {
+					if (Object.prototype.hasOwnProperty.call(p.body, k) && p.body[k] !== undefined && !(k === 'text' && !p.body[k])) { form.append(k, p.body[k]); }
+				}
+				form.append('file', job.file, job.file.name);
+				return requestForm('POST', '/messages', form, p.token);
+			}
 			return request('POST', '/messages', p.body, p.token);
 		});
 	}
@@ -541,6 +767,19 @@
 				node.setAttribute('data-id', String(dto.id));
 				rendered[dto.id] = node;
 			}
+			if (job.file && node.parentNode) {
+				var ph = node.querySelector('.lcff-att-pending');
+				if (ph) { node.removeChild(ph); }
+				if (dto.attachments && dto.attachments.length) {
+					renderAttachments(node, dto.attachments);
+					keepNoticeLast();
+					scrollDown();
+				} else {
+					// The server took the message but dropped the file (PHP file_uploads off): say so.
+					node.classList.add('lcff-message--rejected');
+					node.appendChild(mk('div', 'lcff-unsent', strings.fileFailed || ''));
+				}
+			}
 			noteLogin(job.login, r.data.identity);
 			noteIdentity(r.data.identity);
 			if (job.gen !== gen) { return; } // the answer showed a logged-out account
@@ -565,6 +804,18 @@
 		}
 		// 409 (same id, different text; or a token taken elsewhere) and 422
 		// (invalid input) come back identically on every retry.
+		if (job.file) {
+			var why = null;
+			if (r.status === 413) {
+				why = tooLargeText();
+			} else if (r.status === 422 && r.data && r.data.field === 'file') {
+				why = r.data.reason === 'too_large' ? tooLargeText()
+					: r.data.reason === 'type' ? (strings.fileType || '') : (strings.fileFailed || '');
+			} else if (r.status === 422) {
+				why = strings.fileFailed || '';
+			}
+			if (why !== null) { fail(job, false, why); return; }
+		}
 		fail(job, r.status !== 409 && r.status !== 422);
 	}
 
@@ -573,7 +824,7 @@
 	 * Before the first 2xx the next one carries the same pending token, so it
 	 * still joins the same session.
 	 */
-	function fail(job, retryable) {
+	function fail(job, retryable, message) {
 		var node = job.node;
 		node.removeAttribute('data-queued');
 		node.classList.remove('lcff-message--sending');
@@ -586,14 +837,14 @@
 			node.classList.add('lcff-message--rejected');
 			node.removeAttribute('role');
 			node.removeAttribute('tabindex');
-			node.appendChild(mk('div', 'lcff-unsent', strings.unsent || ''));
+			node.appendChild(mk('div', 'lcff-unsent', message || strings.unsent || ''));
 			return;
 		}
 
 		node.classList.add('lcff-message--failed');
 		node.setAttribute('role', 'button');
 		node.setAttribute('tabindex', '0');
-		node.appendChild(mk('div', 'lcff-retry', strings.retry || ''));
+		node.appendChild(mk('div', 'lcff-retry', job.file ? (strings.fileFailed || '') : (strings.retry || '')));
 		var retry = function () { enqueue(job); };
 		node.onclick = retry;
 		node.onkeydown = function (e) {
@@ -915,11 +1166,14 @@
 	/* Empties the message list; the next session starts from nothing. */
 	function clearView() {
 		rendered = {};
+		viewEpoch++;
+		revokeBlobUrls();
 		discardSeen();
 		lastId = 0;
 		initialDone = false;
 		if (unread) { setUnread(0); }
 		if (!built) { return; }
+		showFileError('');
 		el.input.value = ''; // a draft belongs to whoever typed it
 		var kids = Array.prototype.slice.call(el.list.childNodes);
 		for (var i = 0; i < kids.length; i++) {
@@ -994,6 +1248,7 @@
 		// Nothing can be typed, queued or sent until the check settles.
 		el.input.readOnly = true;
 		el.send.disabled = true;
+		el.attach.disabled = true;
 	}
 
 	function releaseList() {
@@ -1003,6 +1258,7 @@
 		el.list.removeAttribute('aria-busy');
 		el.input.readOnly = false;
 		el.send.disabled = false;
+		el.attach.disabled = false;
 		var waiters = releaseWaiters;
 		releaseWaiters = [];
 		for (var i = 0; i < waiters.length; i++) { waiters[i](); }
