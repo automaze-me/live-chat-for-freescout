@@ -189,20 +189,45 @@
 		el.input.value = '';
 		var clientId = uuid();
 		var node = addPending(text, clientId);
-		send(node, text, clientId);
+		enqueue({ node: node, text: text, clientId: clientId });
 		el.input.focus();
 	}
 
-	function send(node, text, clientId) {
-		node.classList.remove('lcff-message--failed');
-		node.classList.add('lcff-message--sending');
-		node.onclick = null;
-		node.removeAttribute('role');
-		node.removeAttribute('tabindex');
-		var note = node.querySelector('.lcff-retry');
-		if (note) { node.removeChild(note); }
+	/*
+	 * FIFO send queue: exactly one POST is in flight at any time, in submit order.
+	 * The token is read when a POST is dispatched (see request()), so messages
+	 * queued behind the first one carry the token the first response issued and
+	 * all land in the same conversation.
+	 */
+	var queue = [];
+	var inFlight = false;
 
-		request('POST', '/messages', { text: text, client_message_id: clientId }).then(function (r) {
+	function enqueue(job) {
+		if (job.node.getAttribute('data-queued') === '1') { return; }
+		job.node.setAttribute('data-queued', '1');
+		job.node.classList.remove('lcff-message--failed');
+		job.node.classList.add('lcff-message--sending');
+		job.node.onclick = null;
+		job.node.onkeydown = null;
+		job.node.removeAttribute('role');
+		job.node.removeAttribute('tabindex');
+		var note = job.node.querySelector('.lcff-retry');
+		if (note) { job.node.removeChild(note); }
+		queue.push(job);
+		pump();
+	}
+
+	function pump() {
+		if (inFlight || !queue.length) { return; }
+		inFlight = true;
+		var job = queue.shift();
+		var done = function () {
+			job.node.removeAttribute('data-queued');
+			inFlight = false;
+			pump();
+		};
+		request('POST', '/messages', { text: job.text, client_message_id: job.clientId }).then(function (r) {
+			var node = job.node;
 			if ((r.status === 201 || r.status === 200) && r.data && r.data.message) {
 				if (r.data.token) { store('lcff_token', r.data.token); }
 				var dto = r.data.message;
@@ -215,19 +240,39 @@
 					rendered[dto.id] = node;
 				}
 				if (!started) { startPolling(); }
-				return;
+			} else {
+				if (r.status === 401 && r.hadToken) {
+					store('lcff_token', null);
+					stopPolling();
+				}
+				fail(job);
 			}
-			if (r.status === 401 && r.hadToken) {
-				store('lcff_token', null);
-				stopPolling();
-			}
-			fail(node, text, clientId);
+			done();
 		}, function () {
-			fail(node, text, clientId);
+			fail(job);
+			done();
 		});
 	}
 
-	function fail(node, text, clientId) {
+	/*
+	 * A failed message does not block the queue while a session exists (a
+	 * permanent 422/409 must not stall the chat). Without a token, though, every
+	 * later queued message would open its own new session, so those are put into
+	 * the retry state too; the visitor retries them in any order and the first
+	 * success issues the token the rest then share.
+	 */
+	function fail(job) {
+		failNode(job);
+		if (!getToken()) {
+			var rest = queue;
+			queue = [];
+			rest.forEach(failNode);
+		}
+	}
+
+	function failNode(job) {
+		var node = job.node;
+		node.removeAttribute('data-queued');
 		node.classList.remove('lcff-message--sending');
 		node.classList.add('lcff-message--failed');
 		node.setAttribute('role', 'button');
@@ -235,7 +280,7 @@
 		if (!node.querySelector('.lcff-retry')) {
 			node.appendChild(mk('div', 'lcff-retry', strings.retry || ''));
 		}
-		var retry = function () { send(node, text, clientId); };
+		var retry = function () { enqueue(job); };
 		node.onclick = retry;
 		node.onkeydown = function (e) {
 			if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retry(); }
