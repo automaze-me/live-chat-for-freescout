@@ -66,6 +66,8 @@
 	var checking = false;      // a panel-open identity check is running
 	var held = false;          // the message list is hidden until that check settles
 	var gen = 0;               // bumped by forget(); answers to older requests are dropped
+	var askCard = null;        // the email / order-number card on screen, if any
+	var askSeq = 0;
 
 	function visible() { return document.visibilityState === 'visible'; }
 	function active() { return isOpen && visible(); }
@@ -387,6 +389,7 @@
 			if (job.acct && r.data.identity && r.data.identity.account === true) {
 				store('lcff_acct', job.acct);
 			}
+			maybeAsk(node, r.data);
 			// A message was just sent, so there is something to wait for again,
 			// and the server is reachable: a backing-off poller is rescheduled.
 			var wasBackingOff = failures > 0;
@@ -693,6 +696,7 @@
 		for (var i = 0; i < kids.length; i++) {
 			if (kids[i] !== el.welcome) { el.list.removeChild(kids[i]); }
 		}
+		askCard = null;
 	}
 
 	/*
@@ -877,6 +881,218 @@
 		}
 		// {"linked": false}, 409 and errors: nothing is stored. A first send
 		// creates the session, with a login token (loggedIn).
+	}
+
+	/* ---- the email / order-number ask (spec 5.1) ---- */
+
+	/*
+	 * `lcff_ask` is {k: conversation key, n: times shown, m: visitor sends since
+	 * the last ask, e: 1 when only an email may be asked for}. It is written
+	 * only after a send (the token exists by then), reset when the key changes,
+	 * and held in memory when storage is blocked (see store()).
+	 */
+	function readAsk(key) {
+		try {
+			var a = JSON.parse(store('lcff_ask') || 'null');
+			if (a && typeof a === 'object' && a.k === key) {
+				return { k: key, n: +a.n || 0, m: +a.m || 0, e: a.e ? 1 : 0 };
+			}
+		} catch (e) {}
+		return { k: key, n: 0, m: 0, e: 0 };
+	}
+
+	function writeAsk(a) {
+		store('lcff_ask', JSON.stringify({ k: a.k, n: a.n, m: a.m, e: a.e ? 1 : 0 }));
+	}
+
+	function removeAsk() {
+		if (askCard && askCard.parentNode) { askCard.parentNode.removeChild(askCard); }
+		askCard = null;
+	}
+
+	/*
+	 * After a successful send: shows the card after the first message, and once
+	 * more after two further sends if it was skipped or ignored. Never to a
+	 * logged-in visitor, never a third time.
+	 */
+	function maybeAsk(node, data) {
+		var key = data && data.conversation && data.conversation.key;
+		if (typeof key !== 'string' || !key) { return; }
+		if (loggedIn || !lastIdentity || lastIdentity.level !== 'anonymous') { return; }
+		var a = readAsk(key);
+		if (a.n === 1) { a.m++; }
+		var show = a.n === 0 || (a.n === 1 && a.m >= 2);
+		if (show) { a.n++; a.m = 0; }
+		writeAsk(a);
+		if (show) { showAsk(node, key, a.e === 1); }
+	}
+
+	function showAsk(after, key, emailOnly) {
+		removeAsk();
+		var myGen = gen;
+		var canOrder = !!cfg.woo && !emailOnly && identityOn();
+		var id = 'lcff-ask-' + (++askSeq);
+
+		var card = mk('form', 'lcff-ask');
+		card.noValidate = true;
+		card.appendChild(mk('div', 'lcff-ask-intro', canOrder ? (strings.askIntro || '') : (strings.askEmailOnly || '')));
+		var label = mk('label', 'lcff-ask-label', canOrder ? (strings.askLabel || '') : (strings.askLabelEmail || ''));
+		label.setAttribute('for', id);
+		card.appendChild(label);
+		var input = mk('input', 'lcff-ask-input');
+		input.id = id;
+		input.type = canOrder ? 'text' : 'email';
+		input.maxLength = 254;
+		input.autocomplete = canOrder ? 'off' : 'email';
+		card.appendChild(input);
+		var error = mk('div', 'lcff-ask-error');
+		error.setAttribute('role', 'alert');
+		error.hidden = true;
+		card.appendChild(error);
+
+		var row = mk('div', 'lcff-ask-actions');
+		var ok = mk('button', 'lcff-ask-ok', strings.askOk || 'OK');
+		ok.type = 'submit';
+		var later = mk('button', 'lcff-ask-later', strings.askLater || '');
+		later.type = 'button';
+		row.appendChild(ok);
+		row.appendChild(later);
+		card.appendChild(row);
+		var url = typeof cfg.privacyUrl === 'string' ? cfg.privacyUrl : '';
+		if (/^https?:\/\//i.test(url)) {
+			var link = mk('a', 'lcff-ask-privacy', strings.privacy || 'Privacy policy');
+			link.href = url;
+			link.target = '_blank';
+			link.rel = 'noopener';
+			card.appendChild(link);
+		}
+
+		var busy = false;
+		var thanks = function () {
+			if (askCard !== card) { return; }
+			while (card.firstChild) { card.removeChild(card.firstChild); }
+			card.className = 'lcff-ask lcff-ask--done';
+			card.appendChild(mk('div', 'lcff-ask-thanks', strings.askThanks || ''));
+		};
+		var settle = function (resolved) {
+			if (busy === false || myGen !== gen || askCard !== card) { return; }
+			if (!resolved) {
+				// The order did not resolve: the one re-ask wants an email (Ruling P8).
+				var a = readAsk(key);
+				a.e = 1;
+				writeAsk(a);
+			}
+			thanks();
+		};
+
+		later.addEventListener('click', function () {
+			if (askCard === card) { removeAsk(); }
+		});
+		card.addEventListener('submit', function (e) {
+			e.preventDefault();
+			var v = input.value.trim();
+			if (busy || !v) { return; }
+			var chat = getToken();
+			if (!chat) { return; }
+			busy = true;
+			ok.disabled = true;
+			error.hidden = true;
+			var release = function () {
+				busy = false;
+				ok.disabled = false;
+			};
+			var failed = function () {
+				// A network failure: keep the card so the visitor can try again.
+				if (askCard === card && myGen === gen) { release(); }
+			};
+			var done = function (r) {
+				if (r.status === 401) { unauthorized(r.token); }
+			};
+			if (v.indexOf('@') !== -1 || !canOrder) {
+				request('POST', '/identity', { email: v }, chat).then(function (r) {
+					if (myGen !== gen || askCard !== card) { return; }
+					done(r);
+					if (r.status === 200 && r.data) {
+						noteIdentity(r.data.identity);
+						settle(true);
+					} else if (r.status === 409) {
+						settle(true);
+					} else if (r.status === 422) {
+						error.textContent = strings.askInvalid || '';
+						error.hidden = false;
+						release();
+					} else {
+						failed();
+					}
+				}, failed);
+				return;
+			}
+			orderToken(v, chat).then(function (token) {
+				if (myGen !== gen || askCard !== card) { return null; }
+				if (!token) { return { status: 0, data: null }; }
+				return request('POST', '/identity', { order_token: token }, chat).then(function (r) { return r; }, function () {
+					return { status: 0, data: null };
+				});
+			}).then(function (r) {
+				if (!r || myGen !== gen || askCard !== card) { return; }
+				done(r);
+				var resolved = r.status === 409;
+				if (r.status === 200 && r.data) {
+					noteIdentity(r.data.identity);
+					resolved = !!r.data.identity && r.data.identity.level !== 'anonymous';
+				}
+				// "Thanks!" for every outcome: never a name, an email or "not found".
+				settle(resolved);
+			}).then(null, function () {});
+		});
+
+		if (after && after.parentNode === el.list) {
+			el.list.insertBefore(card, after.nextSibling);
+		} else {
+			el.list.appendChild(card);
+		}
+		askCard = card;
+		scrollDown();
+	}
+
+	/*
+	 * Asks WordPress (same origin, with its cookies) to look the order up. The
+	 * answer is an encrypted token bound to `chat`, whether or not the order
+	 * exists. Resolves to the token, or null on any failure. Never rejects.
+	 */
+	function orderToken(number, chat) {
+		return sha256hex(chat).then(function (bind) {
+			if (!bind) { return null; }
+			var timer = null;
+			var clear = function () {
+				if (timer) { clearTimeout(timer); timer = null; }
+			};
+			var init = {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: 'action=lcff_order&number=' + encodeURIComponent(number) + '&bind=' + bind,
+				credentials: 'same-origin',
+				cache: 'no-store'
+			};
+			try {
+				if (typeof window.AbortController === 'function') {
+					var ctrl = new window.AbortController();
+					init.signal = ctrl.signal;
+					timer = setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT);
+				}
+			} catch (e) {}
+			return fetch(cfg.ajaxUrl, init).then(function (res) {
+				return res.text().then(function (t) {
+					clear();
+					var d = null;
+					try { d = JSON.parse(t); } catch (e2) {}
+					return res.ok && d && typeof d.token === 'string' && d.token.indexOf('v1.') === 0 ? d.token : null;
+				});
+			}).then(null, function () {
+				clear();
+				return null;
+			});
+		}).then(null, function () { return null; });
 	}
 
 	/* ---- public API ---- */
