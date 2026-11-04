@@ -245,8 +245,25 @@
 		var n = mk('div', 'lcff-message lcff-message--' + role);
 		n.setAttribute('data-id', String(m.id));
 		n.setAttribute('data-role', role);
-		if (role === 'agent' && m.author) {
-			n.appendChild(mk('div', 'lcff-author', String(m.author)));
+		if (role === 'agent' && (m.author || m.avatar)) {
+			var head = mk('div', 'lcff-author');
+			if (m.avatar) {
+				var img = document.createElement('img');
+				img.className = 'lcff-avatar';
+				img.alt = '';
+				img.width = 28;
+				img.height = 28;
+				img.setAttribute('referrerpolicy', 'no-referrer');
+				img.addEventListener('error', function () {
+					if (img.parentNode) { img.parentNode.removeChild(img); }
+				});
+				img.src = String(m.avatar);
+				head.appendChild(img);
+			}
+			if (m.author) {
+				head.appendChild(mk('span', 'lcff-author-name', String(m.author)));
+			}
+			n.appendChild(head);
 		}
 		n.appendChild(mk('div', 'lcff-text', String(m.text)));
 		if (m.via === 'email') {

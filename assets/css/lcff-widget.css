@@ -169,6 +169,17 @@
 	font-weight: 600;
 	opacity: 0.7;
 	margin-bottom: 2px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.lcff-avatar {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	object-fit: cover;
+	flex: none;
 }
 
 .lcff-message--sending {
