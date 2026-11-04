@@ -190,9 +190,12 @@ class LCFF_Identity {
 			wp_send_json( array( 'error' => 'rate_limited' ), 429 );
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- see class docblock.
-		$raw    = isset( $_POST['number'] ) ? sanitize_text_field( wp_unslash( $_POST['number'] ) ) : '';
-		$number = self::normalize_number( $raw );
+		// Validated as typed (unslashed only): sanitize_text_field() would
+		// change it before the strict check below. It goes back to FreeScout
+		// only through display_number(), sealed inside the token.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- see class docblock; validated below.
+		$raw    = isset( $_POST['number'] ) && is_string( $_POST['number'] ) ? wp_unslash( $_POST['number'] ) : '';
+		$number = self::lookup_number( $raw );
 
 		$email = null;
 		$name  = null;
@@ -202,15 +205,18 @@ class LCFF_Identity {
 			if ( $order ) {
 				$billing = (string) $order->get_billing_email();
 				if ( '' !== $billing && is_email( $billing ) ) {
-					$found = true;
-					$email = $billing;
-					$name  = self::truncate( trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ) );
+					$found  = true;
+					$email  = $billing;
+					$name   = self::truncate( trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ) );
+					$number = (string) $order->get_order_number();
 				}
 			}
 		}
 
+		// Never empty: an answer that is no order number still reaches the
+		// agent as "Order number … not found".
 		$payload          = self::base_payload( 'order', $bind );
-		$payload['num']   = null === $number ? '' : $number;
+		$payload['num']   = self::display_number( $found ? $number : $raw );
 		$payload['found'] = $found;
 		$payload['email'] = $email;
 		$payload['name']  = $name;
@@ -230,6 +236,42 @@ class LCFF_Identity {
 			$n = substr( $n, 1 );
 		}
 		return 1 === preg_match( '#^[A-Za-z0-9/_-]{1,32}$#', $n ) ? $n : null;
+	}
+
+	/**
+	 * The number to look up: the input itself when it is a well-formed order
+	 * number (normalize_number()), else its first run of 3 or more digits
+	 * ("Order 12345", "Nr. 12345."), else none.
+	 *
+	 * @param string $raw Raw input, unslashed.
+	 * @return string|null
+	 */
+	public static function lookup_number( $raw ) {
+		$number = self::normalize_number( $raw );
+		if ( null !== $number ) {
+			return $number;
+		}
+		if ( 1 === preg_match( '/\d{3,}/', (string) $raw, $m ) && strlen( $m[0] ) <= 32 ) {
+			return $m[0];
+		}
+		return null;
+	}
+
+	/**
+	 * The order number as the agent sees it: trimmed, without control
+	 * characters or ':' (FreeScout's line item substitutes ":number"), at
+	 * most 32 characters, and never empty ('?'). Invalid UTF-8 becomes '?'.
+	 *
+	 * @param string $text Order number or the visitor's input.
+	 * @return string
+	 */
+	public static function display_number( $text ) {
+		$text  = wp_check_invalid_utf8( (string) $text );
+		$clean = preg_replace( '/\p{Cc}+/u', '', $text );
+		$text  = null === $clean ? '' : $clean;
+		$text  = trim( str_replace( ':', '', $text ) );
+		$text  = trim( mb_substr( $text, 0, 32, 'UTF-8' ) );
+		return '' === $text ? '?' : $text;
 	}
 
 	/**
