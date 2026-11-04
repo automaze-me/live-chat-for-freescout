@@ -11,7 +11,8 @@
 	var POLL_FAST = 3000;
 	var POLL_SLOW = 30000;
 	var POLL_MAX = 600000;       // backoff ceiling: 10 min
-	var REQUEST_TIMEOUT = 20000; // every request is aborted after 20 s
+	var REQUEST_TIMEOUT = 20000; // every JSON request is aborted after 20 s
+	var UPLOAD_TIMEOUT = 120000; // a multipart upload gets 2 min (a 10 MB file on a mobile link)
 	var RECHECK_EVERY = 1800000; // identity re-check while the panel is open: 30 min
 	var LOGIN_FRESH = 3600000;   // a send with a token fetches a login token once the last one is older: 60 min
 
@@ -138,6 +139,7 @@
 	}
 
 	function rawRequest(method, path, body, token, isForm) {
+		var limit = isForm ? UPLOAD_TIMEOUT : REQUEST_TIMEOUT;
 		var timer = null;
 		function clear() {
 			if (timer) { clearTimeout(timer); timer = null; }
@@ -159,7 +161,7 @@
 				if (typeof window.AbortController === 'function') {
 					var ctrl = new window.AbortController();
 					init.signal = ctrl.signal;
-					timer = setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT);
+					timer = setTimeout(function () { ctrl.abort(); }, limit);
 				}
 			} catch (e) {}
 			return fetch(API + path, init).then(function (res) {
@@ -425,7 +427,12 @@
 			}
 		} catch (e) {}
 		return fetch(API + '/attachments/' + encodeURIComponent(id), init).then(function (res) {
-			if (!res.ok) { throw new Error('lcff: attachment ' + res.status); }
+			if (!res.ok) {
+				var bad = new Error('lcff: attachment ' + res.status);
+				bad.status = res.status;
+				bad.token = t || null;
+				throw bad;
+			}
 			return res.blob();
 		}).then(function (blob) {
 			if (timer) { clearTimeout(timer); }
@@ -435,6 +442,7 @@
 			return url;
 		}, function (err) {
 			if (timer) { clearTimeout(timer); }
+			if (err && err.status === 401) { unauthorized(err.token); }
 			throw err;
 		});
 	}
@@ -469,6 +477,7 @@
 		}, function () {
 			link.classList.remove('lcff-att--busy');
 			link.classList.add('lcff-att--failed');
+			showFileError(strings.fileFailed || '');
 		});
 	}
 
@@ -577,15 +586,17 @@
 	}
 
 	function tooLargeText() {
-		var t = strings.fileTooLarge || '';
-		return attachMb > 0 ? t.replace('{mb}', String(attachMb)) : t.replace(/\s*\(max \{mb\} MB\)/, '').replace('{mb}', '');
+		return attachMb > 0 ? (strings.fileTooLarge || '').replace('{mb}', String(attachMb)) : (strings.fileTooLargeNoLimit || '');
 	}
 
 	/* A chosen file goes out at once, as its own message, with the text typed so far. */
 	function submitFile(file) {
 		if (held) { return; }
 		showFileError('');
-		if (ATTACH_TYPES.indexOf(String(file.type || '').toLowerCase()) === -1) {
+		// An empty type (the OS has no mapping) goes to the server, which sniffs the content.
+		var ft = String(file.type || '').toLowerCase();
+		if (ft === 'image/jpg') { ft = 'image/jpeg'; }
+		if (ft !== '' && ATTACH_TYPES.indexOf(ft) === -1) {
 			showFileError(strings.fileType || '');
 			return;
 		}
