@@ -51,8 +51,9 @@
 	var started = false;
 	var lastId = 0;
 	var rendered = {};      // server id -> element
-	var seenSent = {};      // agent ids already POSTed to /seen
-	var unseenAgentIds = [];
+	var unseenAgentIds = [];  // agent ids rendered while active, not yet queued
+	var pendingSeen = {};     // id -> true: queued for /seen until the server accepts or refuses them
+	var seenInFlight = false; // a /seen request is running
 	var unread = 0;
 	var pollTimer = null;
 	var polling = false;
@@ -611,15 +612,34 @@
 		if (active() && !held) { markSeen(); }
 	}
 
+	/*
+	 * Receipts survive errors: ids wait in pendingSeen until the server
+	 * answers 204 (done) or 422 (never acceptable). 401 and every other
+	 * failure leave them pending; the next trigger (poll answer, visibility
+	 * change, panel open) retries, so there is no loop of its own. At most
+	 * 100 ids go out per request, the server's cap.
+	 */
 	function markSeen() {
 		if (unread) { setUnread(0); }
-		var ids = unseenAgentIds.filter(function (id) { return !seenSent[id]; });
-		unseenAgentIds = [];
 		if (lastAgentId() > 0) { store('lcff_seen', String(lastAgentId())); }
-		if (!ids.length || !getToken()) { return; }
-		ids.slice(0, 100).forEach(function (id) { seenSent[id] = true; });
-		request('POST', '/seen', { message_ids: ids.slice(0, 100) }).then(function () {}, function () {
-			ids.forEach(function (id) { delete seenSent[id]; });
+		unseenAgentIds.forEach(function (id) { pendingSeen[id] = true; });
+		unseenAgentIds = [];
+		if (seenInFlight || !getToken()) { return; }
+		var ids = Object.keys(pendingSeen).map(Number).sort(function (a, b) { return a - b; }).slice(0, 100);
+		if (!ids.length) { return; }
+		var myGen = gen;
+		seenInFlight = true;
+		request('POST', '/seen', { message_ids: ids }).then(function (r) {
+			if (myGen !== gen) { return; } // forgotten meanwhile; clearView() reset the flag
+			seenInFlight = false;
+			if (r.status === 204 || r.status === 422) {
+				ids.forEach(function (id) { delete pendingSeen[id]; });
+				if (r.status === 204 && active() && !held) { markSeen(); }
+			} else if (r.status === 401) {
+				unauthorized(r.token);
+			}
+		}, function () {
+			if (myGen === gen) { seenInFlight = false; }
 		});
 	}
 
@@ -775,7 +795,8 @@
 	/* Empties the message list; the next session starts from nothing. */
 	function clearView() {
 		rendered = {};
-		seenSent = {};
+		pendingSeen = {};
+		seenInFlight = false;
 		unseenAgentIds = [];
 		lastId = 0;
 		initialDone = false;
