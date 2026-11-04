@@ -13,6 +13,7 @@
 	var POLL_MAX = 600000;       // backoff ceiling: 10 min
 	var REQUEST_TIMEOUT = 20000; // every JSON request is aborted after 20 s
 	var UPLOAD_TIMEOUT = 120000; // a multipart upload gets 2 min (a 10 MB file on a mobile link)
+	var DOWNLOAD_RATE = 50000;   // an attachment download gets UPLOAD_TIMEOUT, or 1 s per 50 KB of it when that is longer
 	var RECHECK_EVERY = 1800000; // identity re-check while the panel is open: 30 min
 	var LOGIN_FRESH = 3600000;   // a send with a token fetches a login token once the last one is older: 60 min
 
@@ -69,6 +70,7 @@
 	var blobUrls = [];         // every blob URL this widget made; revoked in clearView()
 	var fileErrorTimer = null;
 	var viewEpoch = 0;         // bumped by clearView(): a blob fetched for an older view is dropped
+	var thumbQueue = [];       // thumbnail loads waiting for the panel to open (see whenShown())
 
 	/* ---- identity state ---- */
 	var lastIdentity = null;   // {level, account} from the latest send, poll or identity answer
@@ -416,8 +418,33 @@
 
 	function isImage(mime) { return /^image\/(jpeg|png|gif|webp)$/.test(String(mime || '')); }
 
+	/* The whole download, body included: a large file on a slow link needs its time. */
+	function downloadTimeout(size) {
+		var bySize = typeof size === 'number' && size > 0 ? Math.ceil(size / DOWNLOAD_RATE) * 1000 : 0;
+		return Math.max(UPLOAD_TIMEOUT, bySize);
+	}
+
+	/*
+	 * Thumbnails load only while the panel is open and its list shown: a
+	 * returning visitor's page view polls the history with the panel closed,
+	 * and must not download every image in it (spec 4: the shop must not get
+	 * slower). Rows rendered meanwhile wait here; open() and releaseList()
+	 * run them, clearView() drops them.
+	 */
+	function whenShown(fn) {
+		if (isOpen && !held) { fn(); } else { thumbQueue.push(fn); }
+	}
+
+	function flushThumbs() {
+		var waiting = thumbQueue;
+		thumbQueue = [];
+		for (var i = 0; i < waiting.length; i++) {
+			try { waiting[i](); } catch (e) {}
+		}
+	}
+
 	/* Fetches an attachment with the chat token; resolves to a blob URL, or rejects. */
-	function loadAttachment(id) {
+	function loadAttachment(a) {
 		var myEpoch = viewEpoch;
 		var t = getToken();
 		var headers = {};
@@ -428,10 +455,10 @@
 			if (typeof window.AbortController === 'function') {
 				var ctrl = new window.AbortController();
 				init.signal = ctrl.signal;
-				timer = setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT);
+				timer = setTimeout(function () { ctrl.abort(); }, downloadTimeout(a.size));
 			}
 		} catch (e) {}
-		return fetch(API + '/attachments/' + encodeURIComponent(id), init).then(function (res) {
+		return fetch(API + '/attachments/' + encodeURIComponent(a.id), init).then(function (res) {
 			if (!res.ok) {
 				var bad = new Error('lcff: attachment ' + res.status);
 				bad.status = res.status;
@@ -468,8 +495,10 @@
 	/* A saved file: a PDF or any other non-image type. Never opened in a tab, since a blob URL has the shop's origin. */
 	function downloadAttachment(a, link) {
 		var epoch = viewEpoch;
+		if (link.classList.contains('lcff-att--busy')) { return; }
+		link.classList.remove('lcff-att--failed');
 		link.classList.add('lcff-att--busy');
-		loadAttachment(a.id).then(function (url) {
+		loadAttachment(a).then(function (url) {
 			link.classList.remove('lcff-att--busy');
 			var dl = document.createElement('a');
 			dl.href = url;
@@ -484,8 +513,20 @@
 			if (epoch !== viewEpoch) { return; } // the view was cleared meanwhile: nothing to report to whoever is here now
 			link.classList.remove('lcff-att--busy');
 			link.classList.add('lcff-att--failed');
-			showFileError(strings.fileFailed || '');
+			showFileError(strings.fileLoadFailed || '');
 		});
+	}
+
+	/* A link that downloads the attachment when clicked. */
+	function fileLink(a, name) {
+		var link = mk('a', 'lcff-att-file', name);
+		link.href = '#';
+		link.setAttribute('role', 'button');
+		link.addEventListener('click', function (e) {
+			e.preventDefault();
+			downloadAttachment(a, link);
+		});
+		return link;
 	}
 
 	function renderAttachments(node, atts) {
@@ -510,23 +551,19 @@
 					});
 					wrap.appendChild(open);
 					var epoch = viewEpoch;
-					loadAttachment(a.id).then(function (url) {
-						shown = url;
-						img.src = url;
-					}, function () {
+					whenShown(function () {
 						if (epoch !== viewEpoch) { return; }
-						wrap.removeChild(open);
-						wrap.appendChild(mk('span', 'lcff-att-name', name));
+						loadAttachment(a).then(function (url) {
+							shown = url;
+							img.src = url;
+						}, function () {
+							if (epoch !== viewEpoch) { return; }
+							// No preview, but the file can still be fetched (and retried) by a click.
+							if (open.parentNode === wrap) { wrap.replaceChild(fileLink(a, name), open); }
+						});
 					});
 				} else {
-					var link = mk('a', 'lcff-att-file', name);
-					link.href = '#';
-					link.setAttribute('role', 'button');
-					link.addEventListener('click', function (e) {
-						e.preventDefault();
-						downloadAttachment(a, link);
-					});
-					wrap.appendChild(link);
+					wrap.appendChild(fileLink(a, name));
 				}
 				node.appendChild(wrap);
 			})(atts[i]);
@@ -602,6 +639,7 @@
 	function submitFile(file) {
 		if (held) { return; }
 		showFileError('');
+		// The checks here refuse before the typed text is taken: it stays in the box.
 		// An empty type (the OS has no mapping) goes to the server, which sniffs the content.
 		var ft = String(file.type || '').toLowerCase();
 		if (ft === 'image/jpg') { ft = 'image/jpeg'; }
@@ -834,9 +872,25 @@
 			} else if (r.status === 422) {
 				why = strings.fileFailed || '';
 			}
-			if (why !== null) { fail(job, false, why); return; }
+			if (why !== null) {
+				fail(job, false, why);
+				giveBackText(job);
+				return;
+			}
 		}
 		fail(job, r.status !== 409 && r.status !== 422);
+	}
+
+	/*
+	 * The file was refused, so the text that rode with it was never sent: it
+	 * goes back into the message box, if that is still empty, to be sent on
+	 * its own. The refused row then shows only the file and the reason.
+	 */
+	function giveBackText(job) {
+		if (!job.text || !built || el.input.value.trim() !== '') { return; }
+		el.input.value = job.text;
+		var t = job.node.querySelector('.lcff-text');
+		if (t) { job.node.removeChild(t); }
 	}
 
 	/*
@@ -1187,6 +1241,7 @@
 	function clearView() {
 		rendered = {};
 		viewEpoch++;
+		thumbQueue = [];
 		revokeBlobUrls();
 		discardSeen();
 		lastId = 0;
@@ -1283,7 +1338,10 @@
 		releaseWaiters = [];
 		for (var i = 0; i < waiters.length; i++) { waiters[i](); }
 		if (active()) { markSeen(); }
-		if (isOpen) { el.input.focus(); }
+		if (isOpen) {
+			flushThumbs();
+			el.input.focus();
+		}
 	}
 
 	/* Resolves once the list is not held (at once when it isn't). */
@@ -1785,7 +1843,10 @@
 		if (identityOn() && store('lcff_acct')) { holdList(); }
 		el.panel.hidden = false;
 		el.panel.classList.add('lcff-panel--open');
-		if (!held) { markSeen(); }
+		if (!held) {
+			markSeen();
+			flushThumbs(); // else releaseList() runs them
+		}
 		// One poll right away; it keeps polling only if the server says so.
 		if (getToken() && !started) { startPolling(); } else if (started) { schedule(0); }
 		checkIdentity();

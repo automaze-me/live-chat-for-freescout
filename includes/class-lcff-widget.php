@@ -67,6 +67,7 @@ class LCFF_Widget {
 				'fileTooLargeNoLimit' => __( 'This file is too large.', 'live-chat-for-freescout' ),
 				'fileType'    => __( 'Only images (JPEG, PNG, GIF, WebP) and PDF files can be sent.', 'live-chat-for-freescout' ),
 				'fileFailed'  => __( "Couldn't send the file.", 'live-chat-for-freescout' ),
+				'fileLoadFailed' => __( "Couldn't load the file.", 'live-chat-for-freescout' ),
 				'askIntro'        => __( "We usually reply within a few minutes. If you leave the page, we'll send the answer by email.", 'live-chat-for-freescout' ),
 				'askLabel'        => __( 'Email or order no.', 'live-chat-for-freescout' ),
 				'askLabelEmail'   => __( 'Email', 'live-chat-for-freescout' ),
