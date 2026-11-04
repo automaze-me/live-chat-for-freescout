@@ -148,6 +148,11 @@
 			var headers = {};
 			if (token === undefined) { token = getToken(); }
 			if (token) { headers['X-Chat-Token'] = token; }
+			// Polls (only polls) tell the agents which page the visitor is on:
+			// the path alone, never the query or the fragment.
+			if (method === 'GET' && path.indexOf('/messages?') === 0) {
+				headers['X-Chat-Page'] = String(window.location.pathname || '/').slice(0, 255);
+			}
 			var init = { method: method, headers: headers, mode: 'cors', credentials: 'omit' };
 			if (body !== undefined) {
 				if (isForm) {
