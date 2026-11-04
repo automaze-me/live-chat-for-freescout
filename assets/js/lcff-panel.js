@@ -462,6 +462,7 @@
 
 	/* A saved file: a PDF or any other non-image type. Never opened in a tab, since a blob URL has the shop's origin. */
 	function downloadAttachment(a, link) {
+		var epoch = viewEpoch;
 		link.classList.add('lcff-att--busy');
 		loadAttachment(a.id).then(function (url) {
 			link.classList.remove('lcff-att--busy');
@@ -475,6 +476,7 @@
 			document.body.removeChild(dl);
 			setTimeout(function () { revokeNow(url); }, 10000);
 		}, function () {
+			if (epoch !== viewEpoch) { return; } // the view was cleared meanwhile: nothing to report to whoever is here now
 			link.classList.remove('lcff-att--busy');
 			link.classList.add('lcff-att--failed');
 			showFileError(strings.fileFailed || '');
@@ -502,10 +504,12 @@
 						if (shown) { window.open(shown, '_blank', 'noopener'); }
 					});
 					wrap.appendChild(open);
+					var epoch = viewEpoch;
 					loadAttachment(a.id).then(function (url) {
 						shown = url;
 						img.src = url;
 					}, function () {
+						if (epoch !== viewEpoch) { return; }
 						wrap.removeChild(open);
 						wrap.appendChild(mk('span', 'lcff-att-name', name));
 					});
