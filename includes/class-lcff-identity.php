@@ -62,30 +62,28 @@ class LCFF_Identity {
 	 * @return string The validated bind value.
 	 */
 	private static function guard() {
+		nocache_headers();
+		// WordPress adds no-store itself only since 6.8.
+		header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private' );
+
 		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : '';
 		if ( 'POST' !== $method ) {
-			nocache_headers();
 			wp_send_json( array( 'error' => 'method_not_allowed' ), 405 );
 		}
 
 		$site = isset( $_SERVER['HTTP_SEC_FETCH_SITE'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_SEC_FETCH_SITE'] ) ) ) : '';
 		if ( 'cross-site' === $site ) {
-			nocache_headers();
 			wp_send_json( array( 'error' => 'forbidden' ), 403 );
 		}
 		if ( ! empty( $_SERVER['HTTP_ORIGIN'] ) && ! self::origin_matches( sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) ) ) {
-			nocache_headers();
 			wp_send_json( array( 'error' => 'forbidden' ), 403 );
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- see class docblock.
 		$bind = isset( $_POST['bind'] ) ? sanitize_text_field( wp_unslash( $_POST['bind'] ) ) : '';
 		if ( 1 !== preg_match( '/^[a-f0-9]{64}$/', $bind ) ) {
-			nocache_headers();
 			wp_send_json( array( 'error' => 'bad_request' ), 400 );
 		}
-
-		nocache_headers();
 
 		if ( ! LCFF_Settings::identity_enabled() ) {
 			wp_send_json( array( 'error' => 'identity_disabled' ), 404 );
@@ -130,6 +128,13 @@ class LCFF_Identity {
 	private static function seal_and_send( array $payload, array $extra = array() ) {
 		$s     = LCFF_Settings::get();
 		$token = LCFF_Crypto::seal( $payload, $s['secret'], $s['site_id'] );
+		if ( null === $token && 'order' === $payload['typ'] && $payload['found'] ) {
+			// Oversize or invalid UTF-8: answer exactly like "not found".
+			$payload['found'] = false;
+			$payload['email'] = null;
+			$payload['name']  = null;
+			$token            = LCFF_Crypto::seal( $payload, $s['secret'], $s['site_id'] );
+		}
 		if ( null === $token ) {
 			wp_send_json( array( 'error' => 'seal_failed' ), 500 );
 		}
@@ -221,11 +226,11 @@ class LCFF_Identity {
 		$order = null;
 		$id    = apply_filters( 'woocommerce_shortcode_order_tracking_order_id', $number ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
 		$found = wc_get_order( $id );
-		if ( $found && ! is_wp_error( $found ) && (string) $found->get_order_number() === $number ) {
+		if ( $found instanceof WC_Order && (string) $found->get_order_number() === $number ) {
 			$order = $found;
 		}
 		$order = apply_filters( 'lcff_find_order', $order, $number );
-		return $order ? $order : null;
+		return $order instanceof WC_Order ? $order : null;
 	}
 
 	/**
