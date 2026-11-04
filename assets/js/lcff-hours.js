@@ -4,7 +4,9 @@
  *
  * hours = { tz: 'Europe/Berlin' | null, offset: minutes | null, days: [7 x (null | ['HH:MM','HH:MM'])] }
  * days[0] is Monday. The end of a range is exclusive.
- * state(hours, nowMs) -> { open: bool, next: ms of the next opening | null }
+ * state(hours, nowMs) -> { open: bool, next: ms of the next opening | null }, or
+ * null when it cannot be computed (unknown time zone, no Intl.formatToParts):
+ * state() never throws, the caller then shows no status.
  */
 (function (root) {
 	'use strict';
@@ -49,7 +51,7 @@
 		return parseInt(hhmm.slice(0, 2), 10) * 60 + parseInt(hhmm.slice(3, 5), 10);
 	}
 
-	function state(hours, nowMs) {
+	function compute(hours, nowMs) {
 		var days = hours && hours.days;
 		if (!days || days.length !== 7) { return { open: false, next: null }; }
 
@@ -71,6 +73,14 @@
 			}
 		}
 		return { open: false, next: null };
+	}
+
+	function state(hours, nowMs) {
+		try {
+			return compute(hours, nowMs);
+		} catch (e) {
+			return null;
+		}
 	}
 
 	var api = { state: state };

@@ -56,4 +56,17 @@ assert.strictEqual(iso(r.next), '2026-11-10T09:00:00.000Z', 'next week');
 r = H.state({ tz: 'Europe/Berlin', offset: null, days: [null, null, null, null, null, null, null] }, at('2026-11-04T09:00:00Z'));
 assert.deepStrictEqual(r, { open: false, next: null });
 
+// failures cost only the status: state() returns null, never throws
+assert.strictEqual(H.state({ tz: 'Bogus/Zone', offset: null, days: week }, at('2026-11-04T09:00:00Z')), null, 'unknown tz');
+var orig = Intl.DateTimeFormat.prototype.formatToParts;
+var cached = { tz: 'America/Chicago', offset: null, days: week }; // fresh zone, no cached formatter
+Intl.DateTimeFormat.prototype.formatToParts = undefined;
+try {
+	assert.strictEqual(H.state(cached, at('2026-11-04T09:00:00Z')), null, 'no formatToParts');
+} finally {
+	Intl.DateTimeFormat.prototype.formatToParts = orig;
+}
+assert.notStrictEqual(H.state(cached, at('2026-11-04T09:00:00Z')), null, 'works again afterwards');
+assert.strictEqual(H.state(null, 0).open, false, 'no hours object');
+
 console.log('PASS hours');

@@ -189,8 +189,16 @@
 	function applyHours() {
 		if (!built || !cfg.hours || !window.LCFF_HOURS) { return; }
 		var now = Date.now();
-		var st = window.LCFF_HOURS.state(cfg.hours, now);
+		var st = null;
+		try { st = window.LCFF_HOURS.state(cfg.hours, now); } catch (e) { st = null; }
 		var line = '';
+		if (st === null) {
+			// Unknown: no status line, normal welcome.
+			el.status.hidden = true;
+			el.status.textContent = '';
+			el.welcome.textContent = cfg.welcome || strings.welcome || '';
+			return;
+		}
 		if (st.open) {
 			line = strings.online || '';
 		} else if (st.next !== null) {
@@ -207,7 +215,8 @@
 	function armHours() {
 		if (hoursTimer) { window.clearInterval(hoursTimer); hoursTimer = null; }
 		if (isOpen && cfg.hours && window.LCFF_HOURS) {
-			applyHours();
+			try { applyHours(); } catch (e) {} // the status line is optional, open() must finish
+
 			hoursTimer = window.setInterval(applyHours, 60000);
 		}
 	}
