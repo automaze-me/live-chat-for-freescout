@@ -34,6 +34,7 @@ class LCFF_Settings {
 			array(
 				'freescout_url' => '',
 				'site_id'       => '',
+				'secret'        => '',
 			),
 			$stored
 		);
@@ -47,6 +48,20 @@ class LCFF_Settings {
 	public static function is_configured() {
 		$s = self::get();
 		return '' !== $s['freescout_url'] && self::is_valid_site_id( $s['site_id'] );
+	}
+
+	public static function is_valid_secret( $secret ) {
+		return is_string( $secret ) && 1 === preg_match( '/^[A-Za-z0-9_-]{43}$/', $secret );
+	}
+
+	/**
+	 * True when the secret is valid and this PHP can seal tokens.
+	 *
+	 * @return bool
+	 */
+	public static function identity_enabled() {
+		$s = self::get();
+		return self::is_valid_secret( $s['secret'] ) && self::is_valid_site_id( $s['site_id'] ) && LCFF_Crypto::available();
 	}
 
 	public static function is_valid_site_id( $site_id ) {
@@ -108,6 +123,20 @@ class LCFF_Settings {
 				'description' => __( 'The 32-character site ID, shown in FreeScout under Manage → Website Chat when you open your website.', 'live-chat-for-freescout' ),
 			)
 		);
+
+		add_settings_field(
+			'secret',
+			__( 'Secret', 'live-chat-for-freescout' ),
+			array( __CLASS__, 'render_field' ),
+			self::PAGE,
+			'lcff_main',
+			array(
+				'key'         => 'secret',
+				'type'        => 'password',
+				'placeholder' => '',
+				'description' => __( 'The 43-character site secret from FreeScout. It lets logged-in visitors and order numbers be recognized. Leave blank to keep the saved value.', 'live-chat-for-freescout' ),
+			)
+		);
 	}
 
 	/**
@@ -137,13 +166,25 @@ class LCFF_Settings {
 			add_settings_error( self::OPTION, 'lcff_site_id', __( 'The Site ID must be 32 lowercase hexadecimal characters.', 'live-chat-for-freescout' ) );
 		}
 
+		$secret = isset( $input['secret'] ) ? trim( sanitize_text_field( wp_unslash( (string) $input['secret'] ) ) ) : '';
+		if ( '' !== $secret ) {
+			if ( self::is_valid_secret( $secret ) ) {
+				$out['secret'] = $secret;
+			} else {
+				add_settings_error( self::OPTION, 'lcff_secret', __( 'The secret must be 43 characters: letters, digits, "-" and "_".', 'live-chat-for-freescout' ) );
+			}
+		}
+
 		return $out;
 	}
 
 	public static function render_field( $args ) {
 		$s     = self::get();
 		$key   = $args['key'];
-		$value = isset( $s[ $key ] ) ? $s[ $key ] : '';
+		$value = ( 'password' !== $args['type'] && isset( $s[ $key ] ) ) ? $s[ $key ] : '';
+		if ( 'password' === $args['type'] && '' !== $s[ $key ] ) {
+			$args['placeholder'] = __( 'Saved — leave blank to keep', 'live-chat-for-freescout' );
+		}
 		printf(
 			'<input type="%1$s" id="lcff_%2$s" name="%3$s[%2$s]" value="%4$s" placeholder="%5$s" class="regular-text" autocomplete="off" />',
 			esc_attr( $args['type'] ),

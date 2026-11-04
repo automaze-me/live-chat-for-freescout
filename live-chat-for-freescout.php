@@ -21,8 +21,11 @@ define( 'LCFF_PLUGIN_FILE', __FILE__ );
 define( 'LCFF_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LCFF_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-crypto.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-settings.php';
+require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-identity.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-widget.php';
 
 LCFF_Settings::init();
 LCFF_Widget::init();
+LCFF_Identity::init();

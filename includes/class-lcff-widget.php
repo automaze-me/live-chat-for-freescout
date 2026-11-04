@@ -35,9 +35,14 @@ class LCFF_Widget {
 			)
 		);
 
-		$config = array(
-			'apiBase'  => $api_base,
-			'panelUrl' => LCFF_PLUGIN_URL . 'assets/js/lcff-panel.js?ver=' . LCFF_VERSION,
+		$identity = LCFF_Settings::identity_enabled();
+		$config   = array(
+			'apiBase'    => $api_base,
+			'panelUrl'   => LCFF_PLUGIN_URL . 'assets/js/lcff-panel.js?ver=' . LCFF_VERSION,
+			'identity'   => $identity,
+			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+			'woo'        => $identity && function_exists( 'wc_get_order' ),
+			'privacyUrl' => (string) get_privacy_policy_url(),
 			'strings'  => array(
 				'title'       => __( 'Chat with us', 'live-chat-for-freescout' ),
 				'welcome'     => __( 'Hi! How can we help?', 'live-chat-for-freescout' ),
@@ -46,6 +51,21 @@ class LCFF_Widget {
 				'close'       => __( 'Close chat', 'live-chat-for-freescout' ),
 				'retry'       => __( "Couldn't send. Tap to retry.", 'live-chat-for-freescout' ),
 				'unsent'      => __( "This message couldn't be sent.", 'live-chat-for-freescout' ),
+				'askIntro'        => __( "We usually reply within a few minutes. If you leave the page, we'll send the answer by email.", 'live-chat-for-freescout' ),
+				'askLabel'        => __( 'Email or order no.', 'live-chat-for-freescout' ),
+				'askLabelEmail'   => __( 'Email', 'live-chat-for-freescout' ),
+				'askOk'           => __( 'OK', 'live-chat-for-freescout' ),
+				'askLater'        => __( 'Not now', 'live-chat-for-freescout' ),
+				'askThanks'       => __( 'Thanks!', 'live-chat-for-freescout' ),
+				'askEmailOnly'    => __( 'Could you leave your email address? Then we can send you the answer.', 'live-chat-for-freescout' ),
+				'askInvalid'      => __( 'Please enter a valid email address.', 'live-chat-for-freescout' ),
+				'privacy'         => __( 'Privacy policy', 'live-chat-for-freescout' ),
+				'noticeEmail'     => __( 'This conversation continues by email. The link in our email brings you back here.', 'live-chat-for-freescout' ),
+				'noticeElsewhere' => __( 'This conversation now continues in another browser.', 'live-chat-for-freescout' ),
+				'continuePrompt'  => __( 'Continue your conversation here?', 'live-chat-for-freescout' ),
+				'continueButton'  => __( 'Continue chat', 'live-chat-for-freescout' ),
+				'continueFailed'  => __( 'This link has expired or was already used.', 'live-chat-for-freescout' ),
+				'viaEmail'        => __( 'via email', 'live-chat-for-freescout' ),
 			),
 		);
 
