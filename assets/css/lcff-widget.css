@@ -113,6 +113,16 @@
 	font-size: 16px;
 }
 
+.lcff-names {
+	min-width: 0;
+}
+
+.lcff-status {
+	font-size: 12px;
+	opacity: 0.85;
+	margin-top: 1px;
+}
+
 .lcff-close {
 	border: 0;
 	background: transparent;

@@ -49,6 +49,9 @@ class LCFF_Widget {
 			array(
 			'apiBase'    => $api_base,
 			'panelUrl'   => LCFF_PLUGIN_URL . 'assets/js/lcff-panel.js?ver=' . LCFF_VERSION,
+			'hoursUrl'   => LCFF_PLUGIN_URL . 'assets/js/lcff-hours.js?ver=' . LCFF_VERSION,
+			// The schedule only; the browser decides open/closed, so a cached page never freezes the state.
+			'hours'      => self::hours_config( $s ),
 			'identity'   => $identity,
 			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 			'woo'        => $identity && function_exists( 'wc_get_order' ),
@@ -73,11 +76,41 @@ class LCFF_Widget {
 				'continuePrompt'  => __( 'Continue your conversation here?', 'live-chat-for-freescout' ),
 				'continueButton'  => __( 'Continue chat', 'live-chat-for-freescout' ),
 				'continueFailed'  => __( 'This link has expired or was already used.', 'live-chat-for-freescout' ),
+				'online'          => __( 'Online · usually replies in a few minutes', 'live-chat-for-freescout' ),
+				/* translators: %s placeholder {time} is replaced in the browser, keep it. */
+				'backToday'       => __( "Back today {time} · we'll answer by email", 'live-chat-for-freescout' ),
+				'backDay'         => __( "Back {day} {time} · we'll answer by email", 'live-chat-for-freescout' ),
 				'viaEmail'        => __( 'via email', 'live-chat-for-freescout' ),
 			),
 			)
 		);
 
 		wp_add_inline_script( 'lcff-loader', 'window.LCFF_CONFIG = ' . wp_json_encode( $config ) . ';', 'before' );
+	}
+
+	/**
+	 * The working-hours part of LCFF_CONFIG, or null when no day is open.
+	 *
+	 * @param array $s Stored settings.
+	 * @return array|null
+	 */
+	public static function hours_config( array $s ) {
+		$days = LCFF_Settings::sanitize_hours( isset( $s['hours'] ) && is_array( $s['hours'] ) ? $s['hours'] : array() );
+		if ( array_filter( $days ) === array() ) {
+			return null;
+		}
+		$tz     = function_exists( 'wp_timezone_string' ) ? (string) wp_timezone_string() : '';
+		$offset = null;
+		if ( 1 === preg_match( '/^([+-])(\d{1,2}):(\d{2})$/', $tz, $m ) ) {
+			$offset = ( '-' === $m[1] ? -1 : 1 ) * ( (int) $m[2] * 60 + (int) $m[3] );
+			$tz     = null;
+		} elseif ( '' === $tz ) {
+			$tz = 'UTC';
+		}
+		return array(
+			'tz'     => $tz,
+			'offset' => $offset,
+			'days'   => $days,
+		);
 	}
 }

@@ -44,6 +44,7 @@ class LCFF_Settings {
 				'welcome_away'  => '',
 				'hidden_paths'  => '',
 				'privacy_url'   => '',
+				'hours'         => array_fill( 0, 7, null ),
 			),
 			$stored
 		);
@@ -186,6 +187,13 @@ class LCFF_Settings {
 			array( 'hidden_paths', __( 'Hide on pages', 'live-chat-for-freescout' ), 'textarea', __( 'One path per line, e.g. /checkout/. A line ending in * hides the chat on every page below it.', 'live-chat-for-freescout' ) ),
 			array( 'privacy_url', __( 'Privacy policy link', 'live-chat-for-freescout' ), 'url', __( 'Leave empty to use the WordPress privacy page.', 'live-chat-for-freescout' ) ),
 		);
+		add_settings_field(
+			'hours',
+			__( 'Working hours', 'live-chat-for-freescout' ),
+			array( __CLASS__, 'render_hours_field' ),
+			self::PAGE,
+			'lcff_appearance'
+		);
 		foreach ( $fields as $f ) {
 			add_settings_field(
 				$f[0],
@@ -201,6 +209,35 @@ class LCFF_Settings {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Renders the seven working-hours rows.
+	 */
+	public static function render_hours_field() {
+		$s     = self::get();
+		$hours = self::sanitize_hours( is_array( $s['hours'] ) ? $s['hours'] : array() );
+		$days  = array(
+			__( 'Monday', 'live-chat-for-freescout' ),
+			__( 'Tuesday', 'live-chat-for-freescout' ),
+			__( 'Wednesday', 'live-chat-for-freescout' ),
+			__( 'Thursday', 'live-chat-for-freescout' ),
+			__( 'Friday', 'live-chat-for-freescout' ),
+			__( 'Saturday', 'live-chat-for-freescout' ),
+			__( 'Sunday', 'live-chat-for-freescout' ),
+		);
+		foreach ( $days as $i => $label ) {
+			$range = $hours[ $i ];
+			$base  = self::OPTION . '[hours][' . $i . ']';
+			echo '<p style="margin:0 0 6px;">';
+			printf( '<strong style="display:inline-block;min-width:6em;">%3$s</strong> <label style="display:inline-block;min-width:6em;"><input type="checkbox" name="%1$s[open]" value="1"%2$s /> %4$s</label> ', esc_attr( $base ), checked( null !== $range, true, false ), esc_html( $label ), esc_html__( 'Open', 'live-chat-for-freescout' ) );
+			printf( '%1$s <input type="time" name="%2$s[from]" value="%3$s" /> ', esc_html__( 'from', 'live-chat-for-freescout' ), esc_attr( $base ), esc_attr( $range ? $range[0] : '09:00' ) );
+			printf( '%1$s <input type="time" name="%2$s[to]" value="%3$s" />', esc_html__( 'to', 'live-chat-for-freescout' ), esc_attr( $base ), esc_attr( $range ? $range[1] : '17:00' ) );
+			echo '</p>';
+		}
+		$tz = function_exists( 'wp_timezone_string' ) ? wp_timezone_string() : '';
+		/* translators: %s: the site's timezone, e.g. Europe/Berlin or +02:00 */
+		echo '<p class="description">' . esc_html( sprintf( __( "Times use the site's timezone (%s).", 'live-chat-for-freescout' ), $tz ) ) . '</p>';
 	}
 
 	/**
@@ -303,7 +340,62 @@ class LCFF_Settings {
 			}
 		}
 
-		return array_merge( $out, LCFF_Appearance::sanitize( $input ) );
+		$out = array_merge( $out, LCFF_Appearance::sanitize( $input ) );
+
+		if ( isset( $input['hours'] ) && is_array( $input['hours'] ) ) {
+			$out['hours'] = self::sanitize_hours( self::hours_from_form( $input['hours'] ) );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Turns the submitted rows (open checkbox, from, to; Monday first) into
+	 * the list form sanitize_hours() takes.
+	 *
+	 * @param array $rows Form rows.
+	 * @return array
+	 */
+	public static function hours_from_form( array $rows ) {
+		$list = array();
+		foreach ( array_values( $rows ) as $row ) {
+			if ( is_array( $row ) && ! empty( $row['open'] ) ) {
+				$list[] = array(
+					isset( $row['from'] ) ? (string) $row['from'] : '',
+					isset( $row['to'] ) ? (string) $row['to'] : '',
+				);
+			} else {
+				$list[] = null;
+			}
+		}
+		return $list;
+	}
+
+	/**
+	 * Seven entries, Monday first: null (closed) or array( 'HH:MM', 'HH:MM' )
+	 * with from < to. Anything else becomes null. No overnight ranges.
+	 *
+	 * @param array $input Entries.
+	 * @return array
+	 */
+	public static function sanitize_hours( array $input ) {
+		$input = array_values( $input );
+		$out   = array();
+		for ( $i = 0; $i < 7; $i++ ) {
+			$out[ $i ] = null;
+			$e         = isset( $input[ $i ] ) ? $input[ $i ] : null;
+			if ( ! is_array( $e ) || 2 !== count( $e ) ) {
+				continue;
+			}
+			$e    = array_values( $e );
+			$from = is_string( $e[0] ) ? $e[0] : '';
+			$to   = is_string( $e[1] ) ? $e[1] : '';
+			$re   = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
+			if ( 1 === preg_match( $re, $from ) && 1 === preg_match( $re, $to ) && strcmp( $from, $to ) < 0 ) {
+				$out[ $i ] = array( $from, $to );
+			}
+		}
+		return $out;
 	}
 
 	public static function render_field( $args ) {

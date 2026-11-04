@@ -110,6 +110,21 @@
 
 	var loading = null;
 
+	function loadScript(url) {
+		return new Promise(function (resolve, reject) {
+			var s = document.createElement('script');
+			s.src = url;
+			s.async = true;
+			s.onload = function () {
+				resolve();
+			};
+			s.onerror = function () {
+				reject(new Error('lcff script failed to load: ' + url));
+			};
+			document.head.appendChild(s);
+		});
+	}
+
 	function loadPanel() {
 		if (window.LCFF) {
 			return Promise.resolve();
@@ -117,18 +132,16 @@
 		if (loading) {
 			return loading;
 		}
-		loading = new Promise(function (resolve, reject) {
-			var s = document.createElement('script');
-			s.src = cfg.panelUrl;
-			s.async = true;
-			s.onload = function () {
-				resolve();
-			};
-			s.onerror = function () {
-				loading = null;
-				reject(new Error('lcff panel failed to load'));
-			};
-			document.head.appendChild(s);
+		/* The hours script goes first so the panel can use it when it builds. A
+		 * failure there only costs the status line, never the chat. */
+		var hours = cfg.hours && cfg.hoursUrl && !window.LCFF_HOURS
+			? loadScript(cfg.hoursUrl).then(null, function () {})
+			: Promise.resolve();
+		loading = hours.then(function () {
+			return loadScript(cfg.panelUrl);
+		}).then(null, function (err) {
+			loading = null;
+			throw err;
 		});
 		return loading;
 	}

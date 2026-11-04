@@ -168,6 +168,50 @@
 
 	function scrollDown() { el.list.scrollTop = el.list.scrollHeight; }
 
+	/* ---- working hours ---- */
+	var hoursTimer = null;
+
+	function fmt(opts, ms) {
+		var lang = document.documentElement.lang || undefined;
+		try {
+			return new Intl.DateTimeFormat(lang, opts).format(new Date(ms));
+		} catch (e) {
+			return new Intl.DateTimeFormat(undefined, opts).format(new Date(ms));
+		}
+	}
+
+	function dayKey(ms) {
+		var d = new Date(ms);
+		return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+	}
+
+	/* Status line and welcome text for the current moment, in the visitor's own clock. */
+	function applyHours() {
+		if (!built || !cfg.hours || !window.LCFF_HOURS) { return; }
+		var now = Date.now();
+		var st = window.LCFF_HOURS.state(cfg.hours, now);
+		var line = '';
+		if (st.open) {
+			line = strings.online || '';
+		} else if (st.next !== null) {
+			var tpl = dayKey(st.next) === dayKey(now) ? (strings.backToday || '') : (strings.backDay || '');
+			line = tpl.replace('{day}', fmt({ weekday: 'long' }, st.next))
+				.replace('{time}', fmt({ hour: 'numeric', minute: '2-digit' }, st.next));
+		}
+		el.status.textContent = line;
+		el.status.hidden = line === '';
+		var text = st.open ? (cfg.welcome || strings.welcome || '') : (cfg.welcomeAway || cfg.welcome || strings.welcome || '');
+		if (el.welcome.textContent !== text) { el.welcome.textContent = text; }
+	}
+
+	function armHours() {
+		if (hoursTimer) { window.clearInterval(hoursTimer); hoursTimer = null; }
+		if (isOpen && cfg.hours && window.LCFF_HOURS) {
+			applyHours();
+			hoursTimer = window.setInterval(applyHours, 60000);
+		}
+	}
+
 	/* ---- build ---- */
 	function build() {
 		if (built) { return; }
@@ -193,7 +237,12 @@
 			avatar.alt = '';
 			who.appendChild(avatar);
 		}
-		who.appendChild(mk('div', 'lcff-title', teamName));
+		var names = mk('div', 'lcff-names');
+		names.appendChild(mk('div', 'lcff-title', teamName));
+		el.status = mk('div', 'lcff-status');
+		el.status.hidden = true;
+		names.appendChild(el.status);
+		who.appendChild(names);
 		header.appendChild(who);
 		el.close = mk('button', 'lcff-close', '×');
 		el.close.type = 'button';
@@ -1421,6 +1470,7 @@
 		if (getToken() && !started) { startPolling(); } else if (started) { schedule(0); }
 		checkIdentity();
 		armRecheck();
+		armHours();
 		scrollDown();
 		if (!held) { el.input.focus(); } // else releaseList() focuses it
 	}
@@ -1431,6 +1481,7 @@
 		el.panel.hidden = true;
 		el.panel.classList.remove('lcff-panel--open');
 		armRecheck(); // stops the re-check timer
+		armHours();
 		if (started) { schedule(); }
 	}
 
