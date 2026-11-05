@@ -380,34 +380,38 @@ msgid "This link has expired or was already used."
 msgstr "Dieser Link ist abgelaufen oder wurde bereits verwendet."
 
 #: includes/class-lcff-widget.php:91
+msgid "The chat couldn't be opened. Please try again."
+msgstr "Der Chat konnte nicht geöffnet werden. Bitte versuche es noch einmal."
+
+#: includes/class-lcff-widget.php:92
 msgid "Online · usually replies in a few minutes"
 msgstr "Online · Antwort meist innerhalb weniger Minuten"
 
 #. translators: Header status while the chat is closed. {time} is replaced in the browser with today's opening time in the site language, e.g. 09:00. Keep {time} as it is.
-#: includes/class-lcff-widget.php:93
+#: includes/class-lcff-widget.php:94
 msgid "Back today {time} · we'll answer by email"
 msgstr "Heute ab {time} Uhr wieder erreichbar · wir antworten dir per E-Mail"
 
 #. translators: Header status while the chat is closed. {day} is replaced in the browser with the weekday name in the site language, e.g. Monday; {time} with the opening time, e.g. 09:00. Keep {day} and {time} as they are.
-#: includes/class-lcff-widget.php:95
+#: includes/class-lcff-widget.php:96
 msgid "Back {day} {time} · we'll answer by email"
 msgstr "Ab {day}, {time} Uhr wieder erreichbar · wir antworten dir per E-Mail"
 
-#: includes/class-lcff-widget.php:96
+#: includes/class-lcff-widget.php:97
 msgid "Too many messages in a short time. Please wait a moment."
 msgstr "Zu viele Nachrichten in kurzer Zeit. Bitte warte einen Moment."
 
 #. translators: Shown when the wait is longer than 90 seconds. {min} is replaced in the browser with the number of minutes to wait, e.g. 60 (always 2 or more). Keep {min} as it is.
-#: includes/class-lcff-widget.php:98
+#: includes/class-lcff-widget.php:99
 msgid "Too many messages in a short time. Please try again in {min} minutes."
 msgstr "Zu viele Nachrichten in kurzer Zeit. Bitte versuche es in {min} Minuten noch einmal."
 
 #. translators: Added after the reason why a chat message wasn't sent (e.g. too many messages); the visitor taps the message to send it again.
-#: includes/class-lcff-widget.php:100
+#: includes/class-lcff-widget.php:101
 msgid "Tap to resend."
 msgstr "Zum erneuten Senden antippen."
 
-#: includes/class-lcff-widget.php:101
+#: includes/class-lcff-widget.php:102
 msgid "via email"
 msgstr "per E-Mail"
 

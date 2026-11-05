@@ -3,7 +3,10 @@
 	'use strict';
 
 	var cfg = window.LCFF_CONFIG;
-	if (!cfg || window.LCFF) {
+	/* The widget's storage keys, { local: [...], session: [...] }: defined
+	 * once, by the loader, which runs first and loads this script. */
+	var KEYS = window.LCFF_STORAGE;
+	if (!cfg || window.LCFF || !KEYS || !KEYS.local || !KEYS.session) {
 		return;
 	}
 	var strings = cfg.strings || {};
@@ -36,6 +39,7 @@
 		continuePrompt: 'Continue your conversation here?',
 		continueButton: 'Continue chat',
 		continueFailed: 'This link has expired or was already used.',
+		continueRetry: 'The chat couldn\'t be opened. Please try again.',
 		online: 'Online · usually replies in a few minutes',
 		backToday: 'Back today {time} · we\'ll answer by email',
 		backDay: 'Back {day} {time} · we\'ll answer by email',
@@ -62,25 +66,44 @@
 	var SEEN_MAX = 100;          // ids per /seen request: the server's cap
 	var SEEN_PAUSE = 4;          // polls without a /seen request after one failed
 
-	/* ---- storage with in-memory fallback ---- */
+	/*
+	 * ---- storage with in-memory fallback ----
+	 * mem keeps what this page wrote, for a browser whose storage refuses
+	 * it. Storage wins whenever it can be read; mem answers only when it
+	 * can't, or when it refused this page's write (blocked or full). So a
+	 * key another tab removed is gone here too.
+	 */
 	var mem = {};
+	var memOnly = {}; // key -> true: storage refused this page's last write
 	function store(key, val) {
 		if (val === undefined) {
 			try {
 				var v = window.localStorage.getItem(key);
-				return v === null ? (mem[key] || null) : v;
-			} catch (e) {
-				return mem[key] || null;
-			}
+				if (v !== null || !memOnly[key]) { return v; }
+			} catch (e) {}
+			return mem[key] || null;
 		}
 		if (val === null) {
 			delete mem[key];
+			delete memOnly[key];
 			try { window.localStorage.removeItem(key); } catch (e2) {}
 			return null;
 		}
 		mem[key] = val;
-		try { window.localStorage.setItem(key, val); } catch (e3) {}
+		try {
+			window.localStorage.setItem(key, val);
+			delete memOnly[key];
+		} catch (e3) {
+			memOnly[key] = true;
+		}
 		return val;
+	}
+
+	/* Clears the widget's localStorage keys (KEYS.local), all but those in `keep`. */
+	function clearStored(keep) {
+		for (var i = 0; i < KEYS.local.length; i++) {
+			if (keep.indexOf(KEYS.local[i]) === -1) { store(KEYS.local[i], null); }
+		}
 	}
 	function getToken() { return store('lcff_token'); }
 
@@ -108,6 +131,8 @@
 	var unread = 0;
 	var pollTimer = null;
 	var polling = false;
+	var pollSeq = 0;        // bumped per poll and when one is abandoned; an abandoned poll's answer changes nothing
+	var pollCtl = null;     // the poll in flight: { abort() } (see abandonPoll())
 	var pollStale = false;  // the poll in flight answers from before a send or login
 	var failures = 0;       // consecutive failed polls, for the backoff
 	var initialDone = false;
@@ -128,6 +153,8 @@
 	var gen = 0;               // bumped by forget(); answers to older requests are dropped
 	var lastLoginAt = 0;       // Date.now() when FreeScout last accepted a login token; 0: not yet
 	var rechecking = false;    // a re-check (see recheckIdentity()) is running
+	var roundSeq = 0;          // bumped per identity round; an older round's answers are dropped
+	var roundWaiters = [];     // dispatches waiting for the running identity round (Ruling P11)
 	var recheckTimer = null;
 	var askCard = null;        // the email / order-number card on screen, if any
 	var askSeq = 0;
@@ -169,10 +196,11 @@
 	 * Resolves to { status, data, hadToken, token }, where `token` is the chat
 	 * token the request carried (null for none); rejects on a network error or
 	 * after REQUEST_TIMEOUT (where AbortController exists). Never throws.
-	 * `token` defaults to the stored token; null sends none.
+	 * `token` defaults to the stored token; null sends none. `ctl`: see
+	 * fetchWithTimeout().
 	 */
-	function request(method, path, body, token) {
-		return rawRequest(method, path, body, token, false);
+	function request(method, path, body, token, ctl) {
+		return rawRequest(method, path, body, token, false, ctl);
 	}
 
 	/* Like request(), with a FormData body and no Content-Type (the browser adds the boundary). */
@@ -223,9 +251,10 @@
 	 * covers reading the body too, so it resolves to a stand-in for the
 	 * Response, { status, ok, text(), blob() }, whose body reads stop the
 	 * clock. A body nobody reads is cut off when the time is up. Rejects on
-	 * a network error or the abort.
+	 * a network error or the abort. With `ctl`, ctl.abort() aborts it
+	 * early (where AbortController exists).
 	 */
-	function fetchWithTimeout(url, init, ms) {
+	function fetchWithTimeout(url, init, ms, ctl) {
 		var timer = null;
 		var stop = function () {
 			if (timer) { clearTimeout(timer); timer = null; }
@@ -235,6 +264,7 @@
 				var ctrl = new window.AbortController();
 				init.signal = ctrl.signal;
 				timer = setTimeout(function () { ctrl.abort(); }, ms);
+				if (ctl) { ctl.abort = function () { ctrl.abort(); }; }
 			}
 		} catch (e) {}
 		var read = function (p) {
@@ -253,7 +283,7 @@
 		});
 	}
 
-	function rawRequest(method, path, body, token, isForm) {
+	function rawRequest(method, path, body, token, isForm, ctl) {
 		try {
 			var headers = {};
 			if (token === undefined) { token = getToken(); }
@@ -272,7 +302,7 @@
 					init.body = JSON.stringify(body);
 				}
 			}
-			return fetchWithTimeout(API + path, init, isForm ? UPLOAD_TIMEOUT : REQUEST_TIMEOUT).then(function (res) {
+			return fetchWithTimeout(API + path, init, isForm ? UPLOAD_TIMEOUT : REQUEST_TIMEOUT, ctl).then(function (res) {
 				return res.text().then(function (t) {
 					var data = null;
 					try { data = t ? JSON.parse(t) : null; } catch (e2) {}
@@ -865,10 +895,14 @@
 	 * Sends one job. Never while the list is held for the panel-open check:
 	 * the token may belong to the account that check is about to forget.
 	 * A job waits for the release and is prepared afterwards, so it uses the
-	 * token (or pending token) of whoever is in front of the screen.
+	 * token (or pending token) of whoever is in front of the screen. It also
+	 * waits for a running identity round, for at most WP_TIMEOUT (Ruling
+	 * P11): a first message sent while WordPress hasn't said yet who is
+	 * logged in would start an anonymous chat for a logged-in visitor, or
+	 * race the round's own session for the same pending token.
 	 */
 	function dispatch(job) {
-		return whenReleased().then(function () {
+		return whenReleased().then(whenIdentitySettled).then(function () {
 			return prepareSend(job);
 		}).then(function (p) {
 			// The widget forgot everything meanwhile: the job is dropped.
@@ -1112,7 +1146,12 @@
 		polling = true;
 		pollStale = false;
 		var myGen = gen;
-		request('GET', '/messages?after=' + encodeURIComponent(lastId)).then(function (r) {
+		var mySeq = ++pollSeq;
+		var ctl = pollCtl = {};
+		request('GET', '/messages?after=' + encodeURIComponent(lastId), undefined, undefined, ctl).then(function (r) {
+			// Abandoned (see abandonPoll()): another poll may be running already.
+			if (mySeq !== pollSeq) { return; }
+			pollCtl = null;
 			var keep = true;
 			try {
 				// Forgotten while in flight (Ruling P5): the answer is dropped.
@@ -1143,15 +1182,35 @@
 				if (keep) { schedule(); } else { stopPolling(); }
 			}
 		}, function () {
-			// Network error or timeout.
+			// Network error or timeout; an abandoned poll is dropped.
+			if (mySeq !== pollSeq) { return; }
+			pollCtl = null;
 			polling = false;
 			pollStale = false;
 			if (seenPause > 0) { seenPause--; }
 			if (myGen === gen) { failures = Math.min(failures + 1, 30); }
 			schedule();
 		}).then(null, function () {
-			polling = false;
+			if (mySeq === pollSeq) { polling = false; }
 		});
+	}
+
+	/*
+	 * Gives up the poll in flight (it answers for a session this page just
+	 * dropped): it is aborted, its answer is ignored, and the next session's
+	 * first poll can go out at once instead of waiting up to REQUEST_TIMEOUT
+	 * for it.
+	 */
+	function abandonPoll() {
+		if (!polling) { return; }
+		pollSeq++;
+		polling = false;
+		pollStale = false;
+		var ctl = pollCtl;
+		pollCtl = null;
+		if (ctl && ctl.abort) {
+			try { ctl.abort(); } catch (e) {}
+		}
 	}
 
 	function handleMessages(list) {
@@ -1367,19 +1426,19 @@
 	}
 
 	/*
-	 * Drops the session this browser holds: the stored token with the seen
-	 * marker, ask state and account marker that belong to it, this tab's
-	 * feature flag, the pending token, the receipts (seen under that token,
-	 * they can never be accepted for another) and the poller. The loader's
-	 * forgetAfterLogout() clears the same storage keys when the panel isn't
-	 * loaded.
+	 * Drops the session this browser holds: every storage key (KEYS: the
+	 * stored token with the seen marker, ask state and account marker that
+	 * belong to it, this tab's feature flag), the pending token, the
+	 * receipts (seen under that token, they can never be accepted for
+	 * another) and the poller. The loader's forgetAfterLogout() clears the
+	 * same keys when the panel isn't loaded.
 	 */
 	function dropSession() {
-		store('lcff_token', null);
-		store('lcff_seen', null);
-		store('lcff_ask', null);
-		store('lcff_acct', null);
-		setPageFlag(false);
+		clearStored([]);
+		for (var i = 0; i < KEYS.session.length; i++) {
+			try { window.sessionStorage.removeItem(KEYS.session[i]); } catch (e) {}
+		}
+		serverTakesPage = false;
 		pendingToken = null;
 		lastIdentity = null;
 		discardSeen();
@@ -1436,6 +1495,7 @@
 	 */
 	function forget() {
 		gen++;
+		abandonPoll();
 		dropSession();
 		failures = 0;
 		loggedIn = false;
@@ -1459,6 +1519,26 @@
 		forget();
 		return sent;
 	}
+
+	/*
+	 * Another tab dropped the session (a logout, a session FreeScout no
+	 * longer knows, another account): this page forgets it too, without a
+	 * reload, so it shows nothing of it and polls no more with its token.
+	 * A page never sees its own storage events. Then, while the panel is
+	 * open, it asks WordPress again who is logged in, so a first message
+	 * typed now waits for the answer (Ruling P11).
+	 */
+	function onStorage(e) {
+		var local = null;
+		try { local = window.localStorage; } catch (x) { return; }
+		if (!e || e.storageArea !== local || e.newValue !== null) { return; }
+		// The token removed, or all of storage cleared (key null).
+		var removed = e.key === null || (e.key === 'lcff_token' && e.oldValue !== null);
+		if (!removed) { return; }
+		forget();
+		if (isOpen) { checkIdentity(); }
+	}
+	window.addEventListener('storage', onStorage);
 
 	/*
 	 * The server-side state changed (a login, a discovered session): poll
@@ -1504,7 +1584,7 @@
 		if (active()) { markSeen(); }
 		if (isOpen) {
 			flushThumbs();
-			el.input.focus();
+			focusComposer();
 		}
 	}
 
@@ -1530,13 +1610,17 @@
 		if (checking) { return; }
 		if (!identityOn()) { releaseList(); return; }
 		checking = true;
+		// N4: a running re-check is superseded; its answers are dropped.
+		rechecking = false;
 		confirmLogout = false;
+		var mySeq = ++roundSeq;
 		var finish = function () {
 			checking = false;
+			if (mySeq === roundSeq) { roundSettled(); }
 			releaseList();
 			renderContinue();
 		};
-		identityRound(true).then(finish, finish);
+		identityRound(true, mySeq).then(finish, finish);
 	}
 
 	/*
@@ -1548,8 +1632,37 @@
 	function recheckIdentity() {
 		if (!loggedIn || checking || rechecking || !identityOn()) { return; }
 		rechecking = true;
-		var done = function () { rechecking = false; };
-		identityRound(true).then(done, done);
+		var mySeq = ++roundSeq;
+		var done = function () {
+			// Superseded by a panel-open check, which owns the state now.
+			if (mySeq !== roundSeq) { return; }
+			rechecking = false;
+			roundSettled();
+		};
+		identityRound(true, mySeq).then(done, done);
+	}
+
+	/* Lets the dispatches waiting for the identity round go. */
+	function roundSettled() {
+		var waiters = roundWaiters;
+		roundWaiters = [];
+		for (var i = 0; i < waiters.length; i++) { waiters[i](); }
+	}
+
+	/*
+	 * Resolves once no identity round runs, or after WP_TIMEOUT, whichever
+	 * comes first (Ruling P11: the round's WordPress call has that long).
+	 * A round that supersedes another keeps the waiters.
+	 */
+	function whenIdentitySettled() {
+		if (!checking && !rechecking) { return Promise.resolve(); }
+		return new Promise(function (resolve) {
+			var timer = setTimeout(resolve, WP_TIMEOUT);
+			roundWaiters.push(function () {
+				clearTimeout(timer);
+				resolve();
+			});
+		});
 	}
 
 	function armRecheck() {
@@ -1562,13 +1675,19 @@
 		}, RECHECK_EVERY);
 	}
 
-	function identityRound(mayRetry) {
+	/*
+	 * One identity round, numbered `mySeq` (roundSeq when it started): a
+	 * newer round, or forget(), makes every later answer of this one count
+	 * for nothing.
+	 */
+	function identityRound(mayRetry, mySeq) {
 		var stored = getToken();
 		if (!stored && !pendingToken) { pendingToken = newToken(); }
 		var chat = stored || pendingToken;
 		var myGen = gen;
+		var stale = function () { return myGen !== gen || mySeq !== roundSeq; };
 		return wpIdentity(chat).then(function (who) {
-			if (!who || myGen !== gen) { return null; }
+			if (!who || stale()) { return null; }
 			if (!who.logged_in) {
 				loggedIn = false;
 				if ((lastIdentity && lastIdentity.account) || store('lcff_acct')) {
@@ -1587,7 +1706,7 @@
 				// the old chat token, so the next round fetches a fresh one.
 				forget();
 				loggedIn = true;
-				return mayRetry ? identityRound(false) : null;
+				return mayRetry ? identityRound(false, mySeq) : null;
 			}
 			loggedIn = true;
 			var now = getToken();
@@ -1596,12 +1715,12 @@
 				// meanwhile stored `chat` itself; any other token can't use it.
 				if (now !== chat) { return null; }
 				return request('POST', '/identity', { login_token: who.token }, chat).then(function (r) {
-					onLogin(r, chat, who.acct, myGen);
+					if (!stale()) { onLogin(r, chat, who.acct, myGen); }
 				});
 			}
 			if (pendingToken !== chat) { return null; }
 			return request('POST', '/identity', { login_token: who.token, new_token: chat }, null).then(function (r) {
-				onDiscovery(r, chat, who.acct, myGen);
+				if (!stale()) { onDiscovery(r, chat, who.acct, myGen); }
 			});
 		});
 	}
@@ -1676,6 +1795,12 @@
 		askCard = null;
 		if (built && el.form) { el.form.hidden = false; } // the message box is back
 		if (wasAway && isOpen && el.input) { el.input.focus(); } // the focused button is gone
+	}
+
+	/* The message box takes the focus, or the away form's input while that form replaces it. */
+	function focusComposer() {
+		var input = askCard && askCard.className.indexOf('lcff-ask-away') !== -1 ? askCard.querySelector('.lcff-ask-input') : null;
+		(input || el.input).focus();
 	}
 
 	/* Only a known "closed" turns the composer into the ask; unknown counts as open. */
@@ -1754,13 +1879,18 @@
 		}
 
 		var busy = false;
+		var thanksText = function () {
+			var t = mk('div', 'lcff-ask-thanks', str('askThanks'));
+			t.setAttribute('role', 'status');
+			return t;
+		};
 		var thanks = function () {
 			if (askCard !== card) { return; }
 			if (away) {
 				// The box comes back; the thanks stays in the conversation.
 				removeAsk();
 				var done = mk('div', 'lcff-ask lcff-ask--done', '');
-				done.appendChild(mk('div', 'lcff-ask-thanks', str('askThanks')));
+				done.appendChild(thanksText());
 				el.list.appendChild(done);
 				askCard = done;
 				scrollDown();
@@ -1768,7 +1898,7 @@
 			}
 			while (card.firstChild) { card.removeChild(card.firstChild); }
 			card.className = 'lcff-ask lcff-ask--done';
-			card.appendChild(mk('div', 'lcff-ask-thanks', str('askThanks')));
+			card.appendChild(thanksText());
 		};
 		var settle = function (resolved) {
 			if (busy === false || myGen !== gen || askCard !== card) { return; }
@@ -1781,8 +1911,10 @@
 			thanks();
 		};
 
+		// Not while a lookup runs: its answer still needs the card (an order
+		// number would be dropped with it).
 		later.addEventListener('click', function () {
-			if (askCard === card) { removeAsk(); }
+			if (!busy && askCard === card) { removeAsk(); }
 		});
 		card.addEventListener('submit', function (e) {
 			e.preventDefault();
@@ -1792,10 +1924,12 @@
 			if (!chat) { return; }
 			busy = true;
 			ok.disabled = true;
+			later.disabled = true;
 			error.hidden = true;
 			var release = function () {
 				busy = false;
 				ok.disabled = false;
+				later.disabled = false;
 			};
 			var failed = function () {
 				// A network failure: keep the card so the visitor can try again.
@@ -1903,10 +2037,13 @@
 
 	/*
 	 * Redeems the link. Resolves to { outcome, wait }: outcome 'ok' (200),
-	 * 'invalid' (410/422), 'rate_limited' (429; `wait` is its retry_after)
-	 * or 'error'. Never rejects.
+	 * 'invalid' (410/422), 'rate_limited' (429; `wait` is its retry_after),
+	 * 'error' (anything else: a network error, a 5xx), or 'stale' when the
+	 * widget forgot everything while the request ran (Ruling P5: the answer
+	 * belongs to the session it dropped, so nothing of it is stored). `myGen`
+	 * is gen when the visitor clicked. Never rejects.
 	 */
-	function redeem(link, retried) {
+	function redeem(link, retried, myGen) {
 		var stored = getToken();
 		var body = { link: link };
 		if (!stored) {
@@ -1915,17 +2052,20 @@
 		}
 		var used = pendingToken;
 		return request('POST', '/continue', body, stored || null).then(function (r) {
+			if (myGen !== gen) { return { outcome: 'stale' }; }
 			if (r.status === 200 && r.data) {
 				// The token is stored only after the 2xx (spec 10).
 				var confirmed = r.hadToken ? r.token : (r.data.token || used);
 				if (confirmed) { store('lcff_token', confirmed); }
 				pendingToken = null;
-				// The full history replaces whatever this browser showed.
+				// The full history replaces whatever this browser showed:
+				// the previous view's storage goes, but not the token just
+				// stored, nor the account marker of the session it continues.
 				gen++;
+				abandonPoll();
 				stopPolling();
 				failures = 0;
-				store('lcff_seen', null);
-				store('lcff_ask', null);
+				clearStored(['lcff_token', 'lcff_acct']);
 				clearView();
 				// A redemption never logs out: the token just stored must stay.
 				confirmLogout = false;
@@ -1936,17 +2076,17 @@
 			if (r.status === 410 || r.status === 422) {
 				if (r.status === 422 && r.data && r.data.field === 'new_token' && !retried) {
 					pendingToken = newToken();
-					return redeem(link, true);
+					return redeem(link, true, myGen);
 				}
 				return { outcome: 'invalid' };
 			}
 			if (!retried && r.status === 409 && !r.hadToken) {
 				pendingToken = newToken();
-				return redeem(link, true);
+				return redeem(link, true, myGen);
 			}
 			if (!retried && r.status === 401 && r.hadToken) {
 				unauthorized(r.token);
-				return redeem(link, true);
+				return redeem(link, true, myGen);
 			}
 			if (r.status === 429) { return { outcome: 'rate_limited', wait: r.data && r.data.retry_after }; }
 			return { outcome: 'error' };
@@ -1990,12 +2130,24 @@
 			busy = true;
 			go.disabled = true;
 			failed.hidden = true;
-			redeem(link, false).then(function (res) {
+			var myGen = gen;
+			redeem(link, false, myGen).then(function (res) {
 				var outcome = res.outcome;
-				if (outcome === 'ok' || outcome === 'invalid') { pendingContinue = null; }
-				if (outcome === 'ok') { return; } // clearView() removed the card
+				if (outcome === 'ok') {
+					// clearView() removed the card.
+					if (pendingContinue === link) { pendingContinue = null; }
+					return;
+				}
+				// The widget forgot everything meanwhile (a logout, another
+				// account): this card went with the view, and the prompt
+				// shown now, if any, has its own state.
+				if (outcome === 'stale' || myGen !== gen || continueCard !== card) { return; }
+				if (outcome === 'invalid') { pendingContinue = null; }
 				busy = false;
-				failed.textContent = outcome === 'rate_limited' ? rateText(res.wait) : str('continueFailed');
+				// Only a refused link has expired; a failure to reach FreeScout
+				// (a network error, a 5xx) can be tried again.
+				failed.textContent = outcome === 'rate_limited' ? rateText(res.wait)
+					: outcome === 'invalid' ? str('continueFailed') : str('continueRetry');
 				failed.hidden = false;
 				if (outcome === 'invalid') {
 					row.style.display = 'none'; // a spent link stays spent
@@ -2028,7 +2180,7 @@
 		armRecheck();
 		armHours();
 		scrollDown();
-		if (!held) { el.input.focus(); } // else releaseList() focuses it
+		if (!held) { focusComposer(); } // else releaseList() focuses it
 	}
 
 	function close() {

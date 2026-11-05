@@ -121,10 +121,11 @@ $readme = (string) file_get_contents( $root . '/readme.txt' );
 $keys   = array();
 foreach ( glob( $root . '/assets/js/*.js' ) as $file ) {
 	$js = (string) file_get_contents( $file );
-	// Keys written as string literals next to a storage call, or in a list of keys the script clears.
+	// Keys written as string literals next to a storage call, or in the loader's
+	// list of every key (window.LCFF_STORAGE: `local: [...]`, `session: [...]`).
 	preg_match_all( "/(?:localStorage|sessionStorage|store)\\.?\\w*\\(\\s*'(lcff_[a-z_]+)'/", $js, $m );
 	$keys = array_merge( $keys, $m[1] );
-	preg_match_all( "/keys\\s*=\\s*\\[([^\\]]*)\\]/", $js, $lists );
+	preg_match_all( "/(?:keys\\s*=|local\\s*:|session\\s*:)\\s*\\[([^\\]]*)\\]/", $js, $lists );
 	foreach ( $lists[1] as $list ) {
 		preg_match_all( "/'(lcff_[a-z_]+)'/", $list, $mm );
 		$keys = array_merge( $keys, $mm[1] );

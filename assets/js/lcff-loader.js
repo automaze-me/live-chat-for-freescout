@@ -7,6 +7,19 @@
 		return;
 	}
 	window.LCFF_LOADER_STARTED = true;
+
+	/*
+	 * Every key the widget keeps in this browser (readme, "Privacy"):
+	 * localStorage holds the session (the chat token, the seen marker, the
+	 * ask state, the account marker), sessionStorage this tab's feature
+	 * flag. Defined once, here: the loader runs first and clears them after
+	 * a logout; the panel it loads reads the same lists to drop a session.
+	 */
+	var STORAGE = window.LCFF_STORAGE = {
+		local: ['lcff_token', 'lcff_seen', 'lcff_ask', 'lcff_acct'],
+		session: ['lcff_page']
+	};
+
 	var strings = cfg.strings || {};
 	// A cached page can lack a key; the built-in English text is the fallback.
 	var DEFAULT_STRINGS = { title: 'Chat with us' };
@@ -62,8 +75,8 @@
 	/*
 	 * Ruling P5 on the logout signal: FreeScout's session forgets the
 	 * account, this browser forgets the session, and the signal is removed.
-	 * It runs before the panel is loaded, so it clears the same storage keys
-	 * as the panel's dropSession() itself.
+	 * It runs before the panel is loaded, so it clears the STORAGE keys
+	 * itself (as the panel's dropSession() does).
 	 */
 	function forgetAfterLogout() {
 		var t = storedToken();
@@ -76,15 +89,17 @@
 				}).then(null, function () {});
 			} catch (e) {}
 		}
-		var keys = ['lcff_token', 'lcff_seen', 'lcff_ask', 'lcff_acct'];
-		for (var k = 0; k < keys.length; k++) {
+		var k;
+		for (k = 0; k < STORAGE.local.length; k++) {
 			try {
-				window.localStorage.removeItem(keys[k]);
+				window.localStorage.removeItem(STORAGE.local[k]);
 			} catch (e2) {}
 		}
-		try {
-			window.sessionStorage.removeItem('lcff_page');
-		} catch (e3) {}
+		for (k = 0; k < STORAGE.session.length; k++) {
+			try {
+				window.sessionStorage.removeItem(STORAGE.session[k]);
+			} catch (e3) {}
+		}
 		expireLogoutSignal();
 	}
 
@@ -161,27 +176,61 @@
 		return loading;
 	}
 
+	/*
+	 * A continue link (#lcff-continue=…) waiting for the panel. It stays here
+	 * until the panel has it, so a panel that failed to load gets it on the
+	 * next bubble click. Nothing is redeemed here: the panel asks for one
+	 * click first.
+	 */
+	var pendingLink = null;
+
+	/* Hands the waiting link to a loaded panel, which opens with the prompt. Returns whether there was one. */
+	function handOverLink() {
+		if (!pendingLink || !window.LCFF) {
+			return false;
+		}
+		var link = pendingLink;
+		pendingLink = null;
+		window.LCFF.continueChat(link);
+		return true;
+	}
+
 	bubble.addEventListener('click', function () {
 		loadPanel().then(function () {
-			if (window.LCFF) {
+			if (window.LCFF && !handOverLink()) {
 				window.LCFF.open();
 			}
 		}, function () {});
 	});
 
-	/* Just logged out: forget, and don't resume. Returning visitor: load right
-	 * away so history and unread badge work. */
-	var continueMatch = /^#lcff-continue=([A-Za-z0-9_-]{43})$/.exec(window.location.hash || '');
-	if (continueMatch) {
-		/* P11: the secret leaves the address bar before anything else runs. */
+	/*
+	 * Takes a continue link out of the address bar (P11: the secret leaves
+	 * it before anything else runs). Returns the link, or null when the
+	 * fragment is not one.
+	 */
+	function takeContinueLink() {
+		var m = /^#lcff-continue=([A-Za-z0-9_-]{43})$/.exec(window.location.hash || '');
+		if (!m) {
+			return null;
+		}
 		try {
 			window.history.replaceState(null, '', window.location.pathname + window.location.search);
 		} catch (e) {}
+		return m[1];
 	}
+
+	function continueLink(link) {
+		pendingLink = link;
+		loadPanel().then(handOverLink, function () {});
+	}
+
+	/* Just logged out: forget, and don't resume. Returning visitor: load right
+	 * away so history and unread badge work. */
+	var startLink = takeContinueLink();
 
 	if (logoutSignalled()) {
 		forgetAfterLogout();
-	} else if (storedToken() && !continueMatch) {
+	} else if (storedToken() && !startLink) {
 		loadPanel().then(function () {
 			if (window.LCFF) {
 				window.LCFF.resume();
@@ -189,13 +238,15 @@
 		}, function () {});
 	}
 
-	/* Nothing is redeemed here: the panel asks for one click first. */
-	if (continueMatch) {
-		var linkToken = continueMatch[1];
-		loadPanel().then(function () {
-			if (window.LCFF) {
-				window.LCFF.continueChat(linkToken);
-			}
-		}, function () {});
+	if (startLink) {
+		continueLink(startLink);
 	}
+
+	/* A link opened on a page that is already showing (only the fragment changed). */
+	window.addEventListener('hashchange', function () {
+		var link = takeContinueLink();
+		if (link) {
+			continueLink(link);
+		}
+	});
 })();

@@ -88,6 +88,7 @@ class LCFF_Widget {
 				'continuePrompt'  => __( 'Continue your conversation here?', 'live-chat-for-freescout' ),
 				'continueButton'  => __( 'Continue chat', 'live-chat-for-freescout' ),
 				'continueFailed'  => __( 'This link has expired or was already used.', 'live-chat-for-freescout' ),
+				'continueRetry'   => __( "The chat couldn't be opened. Please try again.", 'live-chat-for-freescout' ),
 				'online'          => __( 'Online · usually replies in a few minutes', 'live-chat-for-freescout' ),
 				/* translators: Header status while the chat is closed. {time} is replaced in the browser with today's opening time in the site language, e.g. 09:00. Keep {time} as it is. */
 				'backToday'       => __( "Back today {time} · we'll answer by email", 'live-chat-for-freescout' ),
