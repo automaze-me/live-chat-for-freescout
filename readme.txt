@@ -68,11 +68,61 @@ Almost never. The chat stores nothing in the browser until a visitor sends a mes
 
 = What happens outside working hours? =
 
-The chat shows your away message and asks for an email address, so your team can answer by email. Visitors can still send a message. Without any working hours, the chat does not use a schedule.
+The chat shows your away message. After the visitor's first message it asks an anonymous (not logged-in) visitor for an email address, so your reply can reach them, and the visitor answers or dismisses that before writing more. Without any working hours, the chat is treated as always open.
 
 = Can I hide the bubble on some pages? =
 
 Yes. In Settings → Live Chat for FreeScout, list the pages under "Hide on pages", one path per line, for example `/checkout/`. A line that ends in `*` hides the chat on every page below that path.
+
+== External services ==
+
+This plugin connects your website to a FreeScout help desk. FreeScout is free, self-hosted help desk software ([freescout.net](https://freescout.net)). You run the FreeScout server yourself, or someone you trust runs it for you, and you enter its address in Settings → Live Chat for FreeScout. The chat does not work without it, and no other service is involved: no chat provider, no analytics, no tracking.
+
+**Calls from the visitor's browser to your FreeScout server**
+
+When a visitor uses the chat, their browser talks directly to the FreeScout address you configured. The Website Chat module on that server ([github.com/automaze-me/freescout-wordpresschat](https://github.com/automaze-me/freescout-wordpresschat)) receives:
+
+* The messages the visitor writes and the files they attach.
+* An email address or order number, if the visitor enters one in the chat.
+* The path of the page the visitor is viewing, while a conversation is open, so your team sees where the visitor is.
+* A random chat token that identifies the conversation in the browser.
+
+The chat shows the bubble without contacting FreeScout until the visitor opens it. A conversation is created only when the visitor sends a message.
+
+**Calls from your WordPress server to your FreeScout server**
+
+* The "Test connection" button in the settings sends your Site ID, your website's address and, if a secret is saved, a short-lived signed check to FreeScout. It runs only when an administrator clicks it. The plugin makes no other request from your server to FreeScout.
+
+**Logged-in visitors and orders**
+
+If a secret is saved in the settings, your WordPress server signs the identity of a logged-in visitor, and the browser passes it to FreeScout: the WordPress user ID, display name and email address. If WooCommerce is active and a visitor enters an order number, your server looks the order up and the browser passes the order number, the order's email address and the customer's name to FreeScout, so your team sees which order the visitor means.
+
+**Who is behind it**
+
+FreeScout is software that you or your host operates, so its terms and privacy practices are yours. The plugin and the Website Chat module are by automaze.me. FreeScout's own project site is [freescout.net](https://freescout.net).
+
+== Privacy ==
+
+**What the plugin stores in the browser**
+
+Nothing is stored until a visitor sends a message. Showing the bubble stores nothing. After the first message the chat stores:
+
+* `localStorage` `lcff_token`: the random chat token that continues the conversation on other pages.
+* `localStorage` `lcff_seen`: the number of the last reply the visitor has seen.
+* `localStorage` `lcff_ask`: whether the chat has already asked for an email address.
+* `localStorage` `lcff_acct`: which account the conversation belongs to, so it does not carry over to another person.
+* `sessionStorage` `lcff_page`: a per-tab setting for the page address feature, deleted when the tab closes.
+* Cookie `lcff_logout` (10 minutes): set by your WordPress site when a user logs out, so the chat closes the conversation in that browser. It is not tracking, and it is not set for anyone else.
+
+The chat registers itself with the WP Consent API as functional, so consent plugins can list the cookie. Because nothing is stored before a visitor chooses to write a message, the plugin does not show a consent banner of its own.
+
+**What WordPress stores**
+
+The plugin stores no visitor data in WordPress. Its settings are one option (`lcff_settings`). To limit abuse of the identity and order-number checks, it keeps short-lived transients that hold keyed hashes of IP addresses, not the addresses. They expire on their own. Uninstalling the plugin removes the option and the transients.
+
+**Your privacy policy**
+
+Under Settings → Privacy → Policy Guide, the plugin adds suggested text that describes the data above. Add how long your help desk keeps chat conversations. You can also show a link to your privacy policy inside the chat, in the plugin settings.
 
 == Changelog ==
 

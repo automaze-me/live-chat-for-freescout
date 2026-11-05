@@ -30,6 +30,7 @@ require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-settings.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-identity.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-connection.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-widget.php';
+require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-privacy.php';
 
 /**
  * Loads the bundled translations (languages/). On init: WordPress 6.7+
@@ -44,3 +45,4 @@ LCFF_Settings::init();
 LCFF_Widget::init();
 LCFF_Identity::init();
 LCFF_Connection::init();
+LCFF_Privacy::init();

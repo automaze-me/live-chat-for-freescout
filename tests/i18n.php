@@ -20,6 +20,7 @@ $GLOBALS['lcff_td_calls'] = array();
 $GLOBALS['lcff_inline']   = array();
 $GLOBALS['lcff_locale']   = 'en_US';
 function add_action( $hook, $cb, $priority = 10, $args = 1 ) { $GLOBALS['lcff_actions'][ $hook ][] = $cb; }
+function add_filter( $hook, $cb, $priority = 10, $args = 1 ) {}
 function plugin_dir_path( $file ) { return dirname( $file ) . '/'; }
 function plugin_dir_url( $file ) { return 'https://shop.example.test/wp-content/plugins/' . basename( dirname( $file ) ) . '/'; }
 function plugin_basename( $file ) { return basename( dirname( $file ) ) . '/' . basename( $file ); }
