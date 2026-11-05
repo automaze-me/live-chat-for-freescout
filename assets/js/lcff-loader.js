@@ -22,7 +22,11 @@
 
 	var strings = cfg.strings || {};
 	// A cached page can lack a key; the built-in English text is the fallback.
-	var DEFAULT_STRINGS = { title: 'Chat with us' };
+	var DEFAULT_STRINGS = {
+		title: 'Chat with us',
+		loadFailed: 'The chat couldn\'t be loaded. Tap to try again.',
+		unreadCount: '{n} new'
+	};
 	function str(key) {
 		return strings[key] || DEFAULT_STRINGS[key] || '';
 	}
@@ -106,7 +110,9 @@
 	var bubble = document.createElement('button');
 	bubble.type = 'button';
 	bubble.className = 'lcff-bubble';
-	bubble.setAttribute('aria-label', cfg.teamName || str('title'));
+	// The panel (id lcff-panel) is built on the first open; until then it doesn't exist and the bubble says "collapsed".
+	bubble.setAttribute('aria-controls', 'lcff-panel');
+	bubble.setAttribute('aria-expanded', 'false');
 	if (/^#[0-9a-f]{6}$/i.test(cfg.accent || '')) {
 		bubble.style.setProperty('--lcff-accent', cfg.accent);
 	}
@@ -131,11 +137,43 @@
 	root.appendChild(bubble);
 	document.body.appendChild(root);
 
+	/*
+	 * The bubble's name: the team name (or "Chat with us"), plus the unread
+	 * count the badge shows only visually; after a failed panel load, the
+	 * failure text instead.
+	 */
+	var unreadNow = 0;
+	var loadError = false;
+	function setLabel() {
+		var name = cfg.teamName || str('title');
+		var text = loadError ? str('loadFailed')
+			: unreadNow > 0 ? name + ', ' + str('unreadCount').replace('{n}', String(unreadNow)) : name;
+		bubble.setAttribute('aria-label', text);
+		if (loadError) {
+			bubble.title = text;
+		} else {
+			bubble.removeAttribute('title');
+		}
+	}
+
+	function setLoadError(on) {
+		loadError = on;
+		if (on) {
+			bubble.classList.add('lcff-bubble--error');
+		} else {
+			bubble.classList.remove('lcff-bubble--error');
+		}
+		setLabel();
+	}
+	setLabel();
+
 	/* The panel announces unread counts through this event. */
 	document.addEventListener('lcff:unread', function (e) {
 		var n = (e && e.detail && e.detail.count) || 0;
 		badge.textContent = n > 99 ? '99+' : String(n);
 		badge.hidden = n < 1;
+		unreadNow = n;
+		setLabel();
 	});
 
 	var loading = null;
@@ -195,12 +233,26 @@
 		return true;
 	}
 
+	/*
+	 * The bubble toggles the panel; the panel keeps aria-expanded current. A
+	 * panel that failed to load is tried again, and the failure shows on the
+	 * bubble until then.
+	 */
 	bubble.addEventListener('click', function () {
+		if (window.LCFF && bubble.getAttribute('aria-expanded') === 'true') {
+			window.LCFF.close();
+			return;
+		}
+		if (loadError) {
+			setLoadError(false);
+		}
 		loadPanel().then(function () {
 			if (window.LCFF && !handOverLink()) {
 				window.LCFF.open();
 			}
-		}, function () {});
+		}, function () {
+			setLoadError(true);
+		});
 	});
 
 	/*
@@ -221,7 +273,12 @@
 
 	function continueLink(link) {
 		pendingLink = link;
-		loadPanel().then(handOverLink, function () {});
+		if (loadError) {
+			setLoadError(false);
+		}
+		loadPanel().then(handOverLink, function () {
+			setLoadError(true);
+		});
 	}
 
 	/* Just logged out: forget, and don't resume. Returning visitor: load right

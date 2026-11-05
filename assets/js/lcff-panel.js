@@ -139,10 +139,9 @@
 	var el = {};
 	var ATTACH_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
 	var attachMb = 0;          // limits.attachment_mb from the latest answer; 0: not known yet (the server decides)
-	var blobUrls = [];         // every blob URL this widget made; revoked in clearView()
-	var fileErrorTimer = null;
+	var blobUrls = [];         // blob URLs not revoked yet (a thumbnail loading, a download or an opened image); clearView() revokes the rest
 	var viewEpoch = 0;         // bumped by clearView(): a blob fetched for an older view is dropped
-	var thumbQueue = [];       // thumbnail loads waiting for the panel to open (see whenShown())
+	var thumbQueue = [];       // image loads waiting for the panel to open (see whenShown())
 
 	/* ---- identity state ---- */
 	var lastIdentity = null;   // {level, account} from the latest send, poll or identity answer
@@ -390,6 +389,7 @@
 		built = true;
 
 		el.panel = mk('div', 'lcff-panel');
+		el.panel.id = 'lcff-panel'; // the bubble's aria-controls
 		el.panel.setAttribute('role', 'dialog');
 		var teamName = cfg.teamName || str('title');
 		el.panel.setAttribute('aria-label', teamName || 'Chat');
@@ -405,9 +405,12 @@
 		var who = mk('div', 'lcff-who');
 		if (/^https?:\/\//i.test(cfg.avatarUrl || '')) {
 			var avatar = mk('img', 'lcff-header-avatar');
-			avatar.src = cfg.avatarUrl;
 			avatar.alt = '';
 			who.appendChild(avatar);
+			// Loaded on the first open, like every image (see whenShown()); it outlives clearView().
+			var showAvatar = function () { avatar.src = cfg.avatarUrl; };
+			showAvatar.lasting = true;
+			whenShown(showAvatar);
 		}
 		var names = mk('div', 'lcff-names');
 		names.appendChild(mk('div', 'lcff-title', teamName));
@@ -423,8 +426,8 @@
 		header.appendChild(el.close);
 		el.panel.appendChild(header);
 
+		// aria-live comes after the first render (handleMessages()): the history is not news.
 		el.list = mk('div', 'lcff-messages');
-		el.list.setAttribute('aria-live', 'polite');
 		el.welcome = mk('div', 'lcff-welcome', cfg.welcome || str('welcome'));
 		el.list.appendChild(el.welcome);
 		el.panel.appendChild(el.list);
@@ -523,9 +526,11 @@
 		var n = mk('div', 'lcff-message lcff-message--' + role);
 		n.setAttribute('data-id', String(m.id));
 		n.setAttribute('data-role', role);
-		if (role === 'agent' && (m.author || m.avatar)) {
+		// Only an absolute http(s) photo URL, as for cfg.avatarUrl (not protocol-relative).
+		var avatarUrl = role === 'agent' && /^https?:\/\//i.test(String(m.avatar || '')) ? String(m.avatar) : '';
+		if (role === 'agent' && (m.author || avatarUrl)) {
 			var head = mk('div', 'lcff-author');
-			if (m.avatar) {
+			if (avatarUrl) {
 				var img = document.createElement('img');
 				img.className = 'lcff-avatar';
 				img.alt = '';
@@ -533,10 +538,17 @@
 				img.height = 28;
 				img.setAttribute('referrerpolicy', 'no-referrer');
 				img.addEventListener('error', function () {
-					if (img.parentNode) { img.parentNode.removeChild(img); }
+					var h = img.parentNode;
+					if (!h) { return; }
+					h.removeChild(img);
+					// Nothing left (no name): the author line goes too.
+					if (!h.firstChild && h.parentNode) { h.parentNode.removeChild(h); }
 				});
-				img.src = String(m.avatar);
 				head.appendChild(img);
+				var epoch = viewEpoch;
+				whenShown(function () {
+					if (epoch === viewEpoch) { img.src = avatarUrl; }
+				});
 			}
 			if (m.author) {
 				head.appendChild(mk('span', 'lcff-author-name', String(m.author)));
@@ -585,11 +597,12 @@
 	}
 
 	/*
-	 * Thumbnails load only while the panel is open and its list shown: a
-	 * returning visitor's page view polls the history with the panel closed,
-	 * and must not download every image in it (spec 4: the shop must not get
-	 * slower). Rows rendered meanwhile wait here; open() and releaseList()
-	 * run them, clearView() drops them.
+	 * Images (thumbnails, agent photos, the header photo) load only while the
+	 * panel is open and its list shown: a returning visitor's page view polls
+	 * the history with the panel closed, and must not download every image in
+	 * it (spec 4: the shop must not get slower). Loads asked for meanwhile
+	 * wait here; open() and releaseList() run them, clearView() drops all but
+	 * the `lasting` ones (the header photo).
 	 */
 	function whenShown(fn) {
 		if (isOpen && !held) { fn(); } else { thumbQueue.push(fn); }
@@ -603,7 +616,7 @@
 		}
 	}
 
-	/* Fetches an attachment with the chat token; resolves to a blob URL, or rejects. */
+	/* Fetches an attachment with the chat token; resolves to its Blob, or rejects. */
 	function loadAttachment(a) {
 		var myEpoch = viewEpoch;
 		var t = getToken();
@@ -620,9 +633,7 @@
 			return res.blob();
 		}).then(function (blob) {
 			if (myEpoch !== viewEpoch) { throw new Error('lcff: view cleared'); }
-			var url = window.URL.createObjectURL(blob);
-			blobUrls.push(url);
-			return url;
+			return blob;
 		}, function (err) {
 			if (err && err.status === 401) { unauthorized(err.token); }
 			throw err;
@@ -642,14 +653,24 @@
 		try { window.URL.revokeObjectURL(url); } catch (e) {}
 	}
 
+	/* A blob URL for a download or a new tab, revoked after `ms` (the navigation has the blob by then). */
+	function shortUrl(blob, ms) {
+		var url = window.URL.createObjectURL(blob);
+		blobUrls.push(url);
+		setTimeout(function () { revokeNow(url); }, ms);
+		return url;
+	}
+
 	/* A saved file: a PDF or any other non-image type. Never opened in a tab, since a blob URL has the shop's origin. */
 	function downloadAttachment(a, link) {
 		var epoch = viewEpoch;
 		if (link.classList.contains('lcff-att--busy')) { return; }
+		showFileError(''); // a file action: an earlier file error has had its time
 		link.classList.remove('lcff-att--failed');
 		link.classList.add('lcff-att--busy');
-		loadAttachment(a).then(function (url) {
+		loadAttachment(a).then(function (blob) {
 			link.classList.remove('lcff-att--busy');
+			var url = shortUrl(blob, 10000);
 			var dl = document.createElement('a');
 			dl.href = url;
 			dl.download = String(a.name || 'file');
@@ -658,7 +679,6 @@
 			document.body.appendChild(dl);
 			dl.click();
 			document.body.removeChild(dl);
-			setTimeout(function () { revokeNow(url); }, 10000);
 		}, function () {
 			if (epoch !== viewEpoch) { return; } // the view was cleared meanwhile: nothing to report to whoever is here now
 			link.classList.remove('lcff-att--busy');
@@ -667,13 +687,11 @@
 		});
 	}
 
-	/* A link that downloads the attachment when clicked. */
+	/* A button (Enter and Space work) that downloads the attachment. */
 	function fileLink(a, name) {
-		var link = mk('a', 'lcff-att-file', name);
-		link.href = '#';
-		link.setAttribute('role', 'button');
-		link.addEventListener('click', function (e) {
-			e.preventDefault();
+		var link = mk('button', 'lcff-att-file', name);
+		link.type = 'button';
+		link.addEventListener('click', function () {
 			downloadAttachment(a, link);
 		});
 		return link;
@@ -686,25 +704,31 @@
 				var name = String(a.name || '');
 				var wrap = mk('div', 'lcff-att');
 				if (isImage(a.mime)) {
-					var open = mk('a', 'lcff-att-img');
-					open.href = '#';
-					open.setAttribute('role', 'button');
+					// The button carries the name; the image inside has none, so it is read once.
+					var open = mk('button', 'lcff-att-img');
+					open.type = 'button';
 					open.setAttribute('aria-label', name);
 					var img = document.createElement('img');
 					img.className = 'lcff-att-thumb';
-					img.alt = name;
+					img.alt = '';
 					open.appendChild(img);
+					// The row keeps the Blob; the thumbnail's URL is revoked once it has loaded,
+					// and a click opens the image under a URL of its own.
 					var shown = null;
-					open.addEventListener('click', function (e) {
-						e.preventDefault();
-						if (shown) { window.open(shown, '_blank', 'noopener'); }
+					open.addEventListener('click', function () {
+						if (shown) { window.open(shortUrl(shown, 60000), '_blank', 'noopener'); }
 					});
 					wrap.appendChild(open);
 					var epoch = viewEpoch;
 					whenShown(function () {
 						if (epoch !== viewEpoch) { return; }
-						loadAttachment(a).then(function (url) {
-							shown = url;
+						loadAttachment(a).then(function (blob) {
+							shown = blob;
+							var url = window.URL.createObjectURL(blob);
+							blobUrls.push(url);
+							var done = function () { revokeNow(url); };
+							img.addEventListener('load', done);
+							img.addEventListener('error', done);
 							img.src = url;
 						}, function () {
 							if (epoch !== viewEpoch) { return; }
@@ -773,12 +797,11 @@
 		el.input.focus();
 	}
 
+	/* The file error stays until the next file action (a pick, a download) or until the panel closes. */
 	function showFileError(text) {
 		if (!el.fileError) { return; }
 		el.fileError.textContent = text;
 		el.fileError.hidden = !text;
-		if (fileErrorTimer) { clearTimeout(fileErrorTimer); fileErrorTimer = null; }
-		if (text) { fileErrorTimer = setTimeout(function () { showFileError(''); }, 8000); }
 	}
 
 	function tooLargeText() {
@@ -1232,7 +1255,11 @@
 				}
 			}
 		}
-		initialDone = true;
+		if (!initialDone) {
+			initialDone = true;
+			// From now on, rows are news (the history rendered above is not).
+			if (el.list) { el.list.setAttribute('aria-live', 'polite'); }
+		}
 		if (newAgent) { setUnread(unread + newAgent); }
 		keepNoticeLast();
 		if (added && el.list) { scrollDown(); }
@@ -1470,13 +1497,14 @@
 	function clearView() {
 		rendered = {};
 		viewEpoch++;
-		thumbQueue = [];
+		thumbQueue = thumbQueue.filter(function (fn) { return fn.lasting; });
 		revokeBlobUrls();
 		discardSeen();
 		lastId = 0;
 		initialDone = false;
 		if (unread) { setUnread(0); }
 		if (!built) { return; }
+		el.list.removeAttribute('aria-live'); // the next session's history is not news either
 		showFileError('');
 		el.input.value = ''; // a draft belongs to whoever typed it
 		var kids = Array.prototype.slice.call(el.list.childNodes);
@@ -1879,9 +1907,11 @@
 		}
 
 		var busy = false;
+		// The status region goes in empty and gets its text a moment later, so screen readers announce it.
 		var thanksText = function () {
-			var t = mk('div', 'lcff-ask-thanks', str('askThanks'));
+			var t = mk('div', 'lcff-ask-thanks');
 			t.setAttribute('role', 'status');
+			setTimeout(function () { t.textContent = str('askThanks'); }, 100);
 			return t;
 		};
 		var thanks = function () {
@@ -2164,9 +2194,19 @@
 	}
 
 	/* ---- public API ---- */
+
+	/* The loader's bubble: it says whether the panel is open, and takes the focus back on close. */
+	function bubbleEl() { return document.querySelector('#lcff-root .lcff-bubble'); }
+
+	function setExpanded(on) {
+		var b = bubbleEl();
+		if (b) { b.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+	}
+
 	function open() {
 		build();
 		isOpen = true;
+		setExpanded(true);
 		if (identityOn() && store('lcff_acct')) { holdList(); }
 		el.panel.hidden = false;
 		el.panel.classList.add('lcff-panel--open');
@@ -2185,9 +2225,17 @@
 
 	function close() {
 		if (!built) { return; }
+		// Hiding the panel drops the focus; it goes back to the bubble when it was in the panel.
+		var focusWasInside = el.panel.contains(document.activeElement);
 		isOpen = false;
 		el.panel.hidden = true;
 		el.panel.classList.remove('lcff-panel--open');
+		setExpanded(false);
+		showFileError('');
+		if (focusWasInside) {
+			var b = bubbleEl();
+			if (b) { b.focus(); }
+		}
 		armRecheck(); // stops the re-check timer
 		armHours();
 		if (started) { schedule(); }

@@ -100,6 +100,10 @@ class LCFF_Widget {
 				/* translators: Added after the reason why a chat message wasn't sent (e.g. too many messages); the visitor taps the message to send it again. */
 				'retryHint'       => __( 'Tap to resend.', 'live-chat-for-freescout' ),
 				'viaEmail'        => __( 'via email', 'live-chat-for-freescout' ),
+				// The loader's: the bubble's name after the chat failed to load, and its unread count.
+				'loadFailed'      => __( "The chat couldn't be loaded. Tap to try again.", 'live-chat-for-freescout' ),
+				/* translators: Added to the chat button's name for screen readers, after the team name. {n} is replaced in the browser with the number of unread replies, e.g. 3. Keep {n} as it is. */
+				'unreadCount'     => __( '{n} new', 'live-chat-for-freescout' ),
 			),
 			)
 		);

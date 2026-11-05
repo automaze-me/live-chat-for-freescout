@@ -414,6 +414,15 @@ msgstr "Zum erneuten Senden antippen."
 msgid "via email"
 msgstr "per E-Mail"
 
+#: includes/class-lcff-widget.php:104
+msgid "The chat couldn't be loaded. Tap to try again."
+msgstr "Der Chat konnte nicht geladen werden. Zum erneuten Versuch antippen."
+
+#. translators: Added to the chat button's name for screen readers, after the team name. {n} is replaced in the browser with the number of unread replies, e.g. 3. Keep {n} as it is.
+#: includes/class-lcff-widget.php:106
+msgid "{n} new"
+msgstr "{n} neu"
+
 #. translators: %s: the host name of the FreeScout help desk, e.g. help.example.com.
 #: includes/class-lcff-privacy.php:43
 msgid "When you use the chat on this site, your messages and the files you attach go to our help desk at %s. So does an email address or order number you enter in the chat; with an order number, the help desk also receives the order's email address and name. While a conversation is open, the chat sends the path of the page you are viewing. If you are logged in, the chat tells the help desk your account's user ID, name and email address."

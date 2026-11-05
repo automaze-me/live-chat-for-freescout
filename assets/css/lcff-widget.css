@@ -80,6 +80,11 @@
 	filter: brightness(1.1);
 }
 
+/* The panel failed to load (the loader's label says so); a tap tries again. */
+#lcff-root .lcff-bubble.lcff-bubble--error {
+	background: #d63638;
+}
+
 #lcff-root .lcff-bubble-icon {
 	display: block;
 	width: 26px;
@@ -216,11 +221,15 @@
 #lcff-root .lcff-author {
 	font-size: 12px;
 	font-weight: 600;
-	opacity: 0.7;
 	margin-bottom: 2px;
 	display: flex;
 	align-items: center;
 	gap: 8px;
+}
+
+/* Only the name is muted; the photo keeps its colours. */
+#lcff-root .lcff-author-name {
+	opacity: 0.7;
 }
 
 #lcff-root .lcff-avatar {
@@ -496,15 +505,40 @@
 	cursor: zoom-in;
 }
 
+/* The image and file buttons look like the links they were: no button chrome. */
+#lcff-root .lcff-att-img,
+#lcff-root .lcff-att-file {
+	-webkit-appearance: none;
+	appearance: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	white-space: inherit;
+	cursor: pointer;
+}
+
 #lcff-root .lcff-att-img {
 	display: inline-block;
+	vertical-align: top;
+	border-radius: 8px;
 }
 
 #lcff-root .lcff-att-file {
-	color: inherit;
+	display: inline;
 	text-decoration: underline;
 	word-break: break-word;
-	cursor: pointer;
+	overflow-wrap: anywhere;
+}
+
+#lcff-root .lcff-att-img:focus-visible,
+#lcff-root .lcff-att-file:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
 }
 
 #lcff-root .lcff-att--busy {
