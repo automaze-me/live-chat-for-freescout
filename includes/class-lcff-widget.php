@@ -55,6 +55,8 @@ class LCFF_Widget {
 			'identity'   => $identity,
 			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 			'woo'        => $identity && function_exists( 'wc_get_order' ),
+			// Day and time names in the header use the language of these strings, not <html lang>.
+			'locale'     => self::js_locale( determine_locale() ),
 			'strings'  => array(
 				'title'       => __( 'Chat with us', 'live-chat-for-freescout' ),
 				'placeholder' => __( 'Type a message…', 'live-chat-for-freescout' ),
@@ -63,6 +65,7 @@ class LCFF_Widget {
 				'retry'       => __( "Couldn't send. Tap to retry.", 'live-chat-for-freescout' ),
 				'unsent'      => __( "This message couldn't be sent.", 'live-chat-for-freescout' ),
 				'attach'      => __( 'Attach a file', 'live-chat-for-freescout' ),
+				/* translators: {mb} is replaced in the browser with the size limit in megabytes, e.g. 10. Keep {mb} as it is. */
 				'fileTooLarge' => __( 'This file is too large (max {mb} MB).', 'live-chat-for-freescout' ),
 				'fileTooLargeNoLimit' => __( 'This file is too large.', 'live-chat-for-freescout' ),
 				'fileType'    => __( 'Only images (JPEG, PNG, GIF, WebP) and PDF files can be sent.', 'live-chat-for-freescout' ),
@@ -84,8 +87,9 @@ class LCFF_Widget {
 				'continueButton'  => __( 'Continue chat', 'live-chat-for-freescout' ),
 				'continueFailed'  => __( 'This link has expired or was already used.', 'live-chat-for-freescout' ),
 				'online'          => __( 'Online · usually replies in a few minutes', 'live-chat-for-freescout' ),
-				/* translators: %s placeholder {time} is replaced in the browser, keep it. */
+				/* translators: Header status while the chat is closed. {time} is replaced in the browser with today's opening time in the site language, e.g. 09:00. Keep {time} as it is. */
 				'backToday'       => __( "Back today {time} · we'll answer by email", 'live-chat-for-freescout' ),
+				/* translators: Header status while the chat is closed. {day} is replaced in the browser with the weekday name in the site language, e.g. Monday; {time} with the opening time, e.g. 09:00. Keep {day} and {time} as they are. */
 				'backDay'         => __( "Back {day} {time} · we'll answer by email", 'live-chat-for-freescout' ),
 				'rateLimited'     => __( 'Too many messages in a short time. Please wait a moment.', 'live-chat-for-freescout' ),
 				'viaEmail'        => __( 'via email', 'live-chat-for-freescout' ),
@@ -94,6 +98,18 @@ class LCFF_Widget {
 		);
 
 		wp_add_inline_script( 'lcff-loader', 'window.LCFF_CONFIG = ' . wp_json_encode( $config ) . ';', 'before' );
+	}
+
+	/**
+	 * A WordPress locale as a language tag for Intl in the browser: the
+	 * first two parts, joined with "-" (de_DE_formal → de-DE, en_US → en-US,
+	 * de → de).
+	 *
+	 * @param string $wp_locale WordPress locale.
+	 * @return string
+	 */
+	public static function js_locale( $wp_locale ) {
+		return implode( '-', array_slice( explode( '_', (string) $wp_locale ), 0, 2 ) );
 	}
 
 	/**

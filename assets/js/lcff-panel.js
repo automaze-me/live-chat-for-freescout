@@ -258,8 +258,9 @@
 	/* ---- working hours ---- */
 	var hoursTimer = null;
 
+	/* Day and time names in the WordPress locale, the language of the texts around them; <html lang> only for a config without it (a page cached before the update). */
 	function fmt(opts, ms) {
-		var lang = document.documentElement.lang || undefined;
+		var lang = cfg.locale || document.documentElement.lang || undefined;
 		try {
 			return new Intl.DateTimeFormat(lang, opts).format(new Date(ms));
 		} catch (e) {

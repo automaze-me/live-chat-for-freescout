@@ -229,8 +229,11 @@ class LCFF_Settings {
 			$id    = 'lcff_hours_' . $i;
 			$to    = $range ? ( '24:00' === $range[1] ? '00:00' : $range[1] ) : '17:00';
 			echo '<p style="margin:0 0 6px;">';
+			/* translators: Checkbox after a weekday in the working hours: the chat is open on that day. */
 			printf( '<strong style="display:inline-block;min-width:6em;">%1$s</strong> <label for="%2$s_open" style="display:inline-block;min-width:6em;"><input type="checkbox" id="%2$s_open" name="%3$s[open]" value="1"%4$s /> %5$s</label> ', esc_html( $label ), esc_attr( $id ), esc_attr( $base ), checked( null !== $range, true, false ), esc_html__( 'Open', 'live-chat-for-freescout' ) );
+			/* translators: Label before the opening time of a day ("from 09:00"). */
 			printf( '<label for="%1$s_from">%2$s</label> <input type="time" id="%1$s_from" name="%3$s[from]" value="%4$s" /> ', esc_attr( $id ), esc_html__( 'from', 'live-chat-for-freescout' ), esc_attr( $base ), esc_attr( $range ? $range[0] : '09:00' ) );
+			/* translators: Label before the closing time of a day ("to 17:00"). */
 			printf( '<label for="%1$s_to">%2$s</label> <input type="time" id="%1$s_to" name="%3$s[to]" value="%4$s" />', esc_attr( $id ), esc_html__( 'to', 'live-chat-for-freescout' ), esc_attr( $base ), esc_attr( $to ) );
 			echo '</p>';
 		}

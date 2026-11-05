@@ -8,6 +8,7 @@
  * License:           GPLv2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       live-chat-for-freescout
+ * Domain Path:       /languages
  *
  * @package LiveChatForFreeScout
  */
@@ -27,6 +28,15 @@ require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-settings.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-identity.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-connection.php';
 require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-widget.php';
+
+/**
+ * Loads the bundled translations (languages/). On init: WordPress 6.7+
+ * warns when a plugin loads its translations earlier.
+ */
+function lcff_load_textdomain() {
+	load_plugin_textdomain( 'live-chat-for-freescout', false, dirname( plugin_basename( LCFF_PLUGIN_FILE ) ) . '/languages' );
+}
+add_action( 'init', 'lcff_load_textdomain' );
 
 LCFF_Settings::init();
 LCFF_Widget::init();
