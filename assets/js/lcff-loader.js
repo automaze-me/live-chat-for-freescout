@@ -104,7 +104,12 @@
 	badge.hidden = true;
 	bubble.appendChild(badge);
 
-	document.body.appendChild(bubble);
+	/* The bubble and, later, the panel live in one root element; the
+	 * stylesheet resets everything inside it against the theme's CSS. */
+	var root = document.createElement('div');
+	root.id = 'lcff-root';
+	root.appendChild(bubble);
+	document.body.appendChild(root);
 
 	/* The panel announces unread counts through this event. */
 	document.addEventListener('lcff:unread', function (e) {

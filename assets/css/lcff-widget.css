@@ -1,18 +1,55 @@
-.lcff-bubble,
-.lcff-panel {
-	--lcff-accent: #2f6f5e;
-	box-sizing: border-box;
+/*
+ * Theme isolation (Ruling P1). The bubble and the panel live in one
+ * <div id="lcff-root">, which the loader appends to <body>. `all: initial`
+ * keeps what the page would pass down (font, line-height, letter-spacing,
+ * text-transform, alignment) out of the root; `all: revert` takes the theme's
+ * element rules (button, input[type=text], img, svg, a, ...) off the widget's
+ * own elements and leaves the browser's defaults. Every other rule starts with
+ * #lcff-root, so it outranks a theme's class and element selectors. `all`
+ * doesn't touch custom properties, so --lcff-accent still works. A theme rule
+ * with !important, or with an id that matches the widget, can still win.
+ */
+#lcff-root {
+	all: initial;
+	display: block;
+	direction: ltr;
+	color: #1d2327;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	font-size: 15px;
 	line-height: 1.4;
+	letter-spacing: normal;
+	text-transform: none;
+	text-align: left;
 }
 
-.lcff-panel *,
-.lcff-bubble * {
+#lcff-root :where(div, span, form, label, button, input, textarea, a, img, svg) {
+	all: revert;
+}
+
+/* `hidden` hides, whatever display a rule below gives the element. */
+#lcff-root [hidden] {
+	display: none !important;
+}
+
+/* Controls use the widget's text, not the browser's control font. */
+#lcff-root button,
+#lcff-root input,
+#lcff-root textarea {
+	font: inherit;
+}
+
+#lcff-root .lcff-bubble,
+#lcff-root .lcff-panel {
+	--lcff-accent: #2f6f5e;
 	box-sizing: border-box;
 }
 
-.lcff-bubble {
+#lcff-root .lcff-panel *,
+#lcff-root .lcff-bubble * {
+	box-sizing: border-box;
+}
+
+#lcff-root .lcff-bubble {
 	position: fixed;
 	right: 20px;
 	bottom: 20px;
@@ -31,12 +68,12 @@
 	justify-content: center;
 }
 
-.lcff-bubble:hover,
-.lcff-bubble:focus-visible {
+#lcff-root .lcff-bubble:hover,
+#lcff-root .lcff-bubble:focus-visible {
 	filter: brightness(1.1);
 }
 
-.lcff-bubble-icon {
+#lcff-root .lcff-bubble-icon {
 	display: block;
 	width: 26px;
 	height: 26px;
@@ -45,7 +82,7 @@
 	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 1-2z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-.lcff-badge {
+#lcff-root .lcff-badge {
 	position: absolute;
 	top: -4px;
 	right: -4px;
@@ -61,12 +98,7 @@
 	text-align: center;
 }
 
-.lcff-badge[hidden],
-.lcff-panel[hidden] {
-	display: none;
-}
-
-.lcff-panel {
+#lcff-root .lcff-panel {
 	position: fixed;
 	right: 20px;
 	bottom: 88px;
@@ -83,7 +115,7 @@
 	overflow: hidden;
 }
 
-.lcff-header {
+#lcff-root .lcff-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -92,14 +124,14 @@
 	color: #fff;
 }
 
-.lcff-who {
+#lcff-root .lcff-who {
 	display: flex;
 	align-items: center;
 	gap: 10px;
 	min-width: 0;
 }
 
-.lcff-header-avatar {
+#lcff-root .lcff-header-avatar {
 	width: 32px;
 	height: 32px;
 	flex: none;
@@ -108,22 +140,22 @@
 	background: rgba(255, 255, 255, 0.25);
 }
 
-.lcff-title {
+#lcff-root .lcff-title {
 	font-weight: 600;
 	font-size: 16px;
 }
 
-.lcff-names {
+#lcff-root .lcff-names {
 	min-width: 0;
 }
 
-.lcff-status {
+#lcff-root .lcff-status {
 	font-size: 12px;
 	opacity: 0.85;
 	margin-top: 1px;
 }
 
-.lcff-close {
+#lcff-root .lcff-close {
 	border: 0;
 	background: transparent;
 	color: inherit;
@@ -133,7 +165,7 @@
 	cursor: pointer;
 }
 
-.lcff-messages {
+#lcff-root .lcff-messages {
 	flex: 1;
 	overflow-y: auto;
 	padding: 14px;
@@ -143,7 +175,7 @@
 	background: #f6f7f7;
 }
 
-.lcff-welcome {
+#lcff-root .lcff-welcome {
 	align-self: flex-start;
 	max-width: 85%;
 	padding: 8px 12px;
@@ -152,7 +184,7 @@
 	border: 1px solid #dcdcde;
 }
 
-.lcff-message {
+#lcff-root .lcff-message {
 	max-width: 85%;
 	padding: 8px 12px;
 	border-radius: 12px;
@@ -160,21 +192,21 @@
 	white-space: pre-wrap;
 }
 
-.lcff-message--visitor {
+#lcff-root .lcff-message--visitor {
 	align-self: flex-end;
 	background: var(--lcff-accent);
 	color: #fff;
 	border-bottom-right-radius: 2px;
 }
 
-.lcff-message--agent {
+#lcff-root .lcff-message--agent {
 	align-self: flex-start;
 	background: #fff;
 	border: 1px solid #dcdcde;
 	border-bottom-left-radius: 2px;
 }
 
-.lcff-author {
+#lcff-root .lcff-author {
 	font-size: 12px;
 	font-weight: 600;
 	opacity: 0.7;
@@ -184,7 +216,7 @@
 	gap: 8px;
 }
 
-.lcff-avatar {
+#lcff-root .lcff-avatar {
 	width: 28px;
 	height: 28px;
 	border-radius: 50%;
@@ -192,38 +224,38 @@
 	flex: none;
 }
 
-.lcff-message--sending {
+#lcff-root .lcff-message--sending {
 	opacity: 0.6;
 }
 
-.lcff-message--failed {
+#lcff-root .lcff-message--failed {
 	background: #fcf0f1;
 	color: #1d2327;
 	border: 1px solid #d63638;
 	cursor: pointer;
 }
 
-.lcff-retry {
+#lcff-root .lcff-retry {
 	font-size: 12px;
 	color: #d63638;
 	margin-top: 2px;
 }
 
 /* Rejected by the server (409/422): retrying can't help, so it isn't offered. */
-.lcff-message--rejected {
+#lcff-root .lcff-message--rejected {
 	background: #fcf0f1;
 	color: #1d2327;
 	border: 1px solid #d63638;
 	cursor: default;
 }
 
-.lcff-unsent {
+#lcff-root .lcff-unsent {
 	font-size: 12px;
 	color: #d63638;
 	margin-top: 2px;
 }
 
-.lcff-ask {
+#lcff-root .lcff-ask {
 	align-self: stretch;
 	margin: 0;
 	padding: 10px 12px;
@@ -237,22 +269,18 @@
 	font-size: 14px;
 }
 
-.lcff-form[hidden] {
-	display: none;
-}
-
-.lcff-ask-away {
+#lcff-root .lcff-ask-away {
 	align-self: auto;
 	border-radius: 0;
 	border-width: 1px 0 0;
 	border-color: #dcdcde;
 }
 
-.lcff-ask-label {
+#lcff-root .lcff-ask-label {
 	font-weight: 600;
 }
 
-.lcff-ask-input {
+#lcff-root .lcff-ask-input {
 	width: 100%;
 	height: 40px;
 	padding: 8px 10px;
@@ -263,17 +291,17 @@
 	background: #fff;
 }
 
-.lcff-ask-error {
+#lcff-root .lcff-ask-error {
 	color: #d63638;
 }
 
-.lcff-ask-actions {
+#lcff-root .lcff-ask-actions {
 	display: flex;
 	gap: 8px;
 }
 
-.lcff-ask-ok,
-.lcff-ask-later {
+#lcff-root .lcff-ask-ok,
+#lcff-root .lcff-ask-later {
 	min-height: 40px;
 	padding: 0 16px;
 	border-radius: 8px;
@@ -281,42 +309,42 @@
 	cursor: pointer;
 }
 
-.lcff-ask-ok {
+#lcff-root .lcff-ask-ok {
 	border: 0;
 	background: var(--lcff-accent);
 	color: #fff;
 	font-weight: 600;
 }
 
-.lcff-ask-ok:disabled {
+#lcff-root .lcff-ask-ok:disabled {
 	opacity: 0.5;
 	cursor: default;
 }
 
-.lcff-ask-later {
+#lcff-root .lcff-ask-later {
 	border: 1px solid #8c8f94;
 	background: #fff;
 	color: #1d2327;
 }
 
-.lcff-ask-privacy {
+#lcff-root .lcff-ask-privacy {
 	font-size: 12px;
 	color: #50575e;
 }
 
-.lcff-ask--done {
+#lcff-root .lcff-ask--done {
 	border-left-color: #dcdcde;
 }
 
-.lcff-ask-input:focus-visible,
-.lcff-ask-ok:focus-visible,
-.lcff-ask-later:focus-visible,
-.lcff-ask-privacy:focus-visible {
+#lcff-root .lcff-ask-input:focus-visible,
+#lcff-root .lcff-ask-ok:focus-visible,
+#lcff-root .lcff-ask-later:focus-visible,
+#lcff-root .lcff-ask-privacy:focus-visible {
 	outline: 2px solid #2271b1;
 	outline-offset: 2px;
 }
 
-.lcff-form {
+#lcff-root .lcff-form {
 	display: flex;
 	gap: 8px;
 	padding: 10px;
@@ -325,7 +353,7 @@
 	margin: 0;
 }
 
-.lcff-input {
+#lcff-root .lcff-input {
 	flex: 1;
 	resize: none;
 	height: 40px;
@@ -337,7 +365,7 @@
 	background: #fff;
 }
 
-.lcff-send {
+#lcff-root .lcff-send {
 	border: 0;
 	border-radius: 8px;
 	padding: 0 16px;
@@ -348,47 +376,47 @@
 	cursor: pointer;
 }
 
-.lcff-send:disabled {
+#lcff-root .lcff-send:disabled {
 	opacity: 0.5;
 	cursor: default;
 }
 
-.lcff-bubble:focus-visible,
-.lcff-send:focus-visible,
-.lcff-close:focus-visible,
-.lcff-input:focus-visible {
+#lcff-root .lcff-bubble:focus-visible,
+#lcff-root .lcff-send:focus-visible,
+#lcff-root .lcff-close:focus-visible,
+#lcff-root .lcff-input:focus-visible {
 	outline: 2px solid #2271b1;
 	outline-offset: 2px;
 }
 
-.lcff-bubble.lcff-left,
-.lcff-panel.lcff-left {
+#lcff-root .lcff-bubble.lcff-left,
+#lcff-root .lcff-panel.lcff-left {
 	right: auto;
 	left: 20px;
 }
 
 @media (max-width: 479px) {
-	.lcff-panel,
-	.lcff-panel.lcff-left {
+	#lcff-root .lcff-panel,
+	#lcff-root .lcff-panel.lcff-left {
 		inset: 0;
 		width: 100%;
 		height: 100%;
 		max-height: none;
 		border-radius: 0;
 	}
-	.lcff-input,
-	.lcff-ask-input {
+	#lcff-root .lcff-input,
+	#lcff-root .lcff-ask-input {
 		font-size: 16px;
 	}
 }
 
-.lcff-via {
+#lcff-root .lcff-via {
 	margin-top: 2px;
 	font-size: 11px;
 	opacity: 0.7;
 }
 
-.lcff-notice {
+#lcff-root .lcff-notice {
 	align-self: center;
 	margin: 8px 12px;
 	padding: 8px 12px;
@@ -399,7 +427,7 @@
 	text-align: center;
 }
 
-.lcff-attach {
+#lcff-root .lcff-attach {
 	flex: none;
 	width: 40px;
 	height: 40px;
@@ -414,17 +442,22 @@
 	justify-content: center;
 }
 
-.lcff-attach:disabled {
+#lcff-root .lcff-attach svg {
+	width: 20px;
+	height: 20px;
+}
+
+#lcff-root .lcff-attach:disabled {
 	opacity: 0.5;
 	cursor: default;
 }
 
-.lcff-attach:focus-visible {
+#lcff-root .lcff-attach:focus-visible {
 	outline: 2px solid #2271b1;
 	outline-offset: 2px;
 }
 
-.lcff-file-error {
+#lcff-root .lcff-file-error {
 	padding: 6px 12px;
 	font-size: 12px;
 	color: #d63638;
@@ -432,15 +465,11 @@
 	border-top: 1px solid #dcdcde;
 }
 
-.lcff-file-error[hidden] {
-	display: none;
-}
-
-.lcff-att {
+#lcff-root .lcff-att {
 	margin-top: 4px;
 }
 
-.lcff-att-thumb {
+#lcff-root .lcff-att-thumb {
 	display: block;
 	max-width: 220px;
 	max-height: 220px;
@@ -451,32 +480,32 @@
 	cursor: zoom-in;
 }
 
-.lcff-att-img {
+#lcff-root .lcff-att-img {
 	display: inline-block;
 }
 
-.lcff-att-file {
+#lcff-root .lcff-att-file {
 	color: inherit;
 	text-decoration: underline;
 	word-break: break-word;
 	cursor: pointer;
 }
 
-.lcff-att--busy {
+#lcff-root .lcff-att--busy {
 	opacity: 0.6;
 }
 
-.lcff-att--failed {
+#lcff-root .lcff-att--failed {
 	text-decoration: line-through;
 }
 
-.lcff-att-pending {
+#lcff-root .lcff-att-pending {
 	font-size: 13px;
 	opacity: 0.85;
 	word-break: break-word;
 }
 
-.lcff-hp {
+#lcff-root .lcff-hp {
 	position: absolute;
 	left: -10000px;
 	width: 1px;

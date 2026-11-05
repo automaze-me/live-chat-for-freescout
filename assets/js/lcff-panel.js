@@ -415,8 +415,20 @@
 			if (e.key === 'Escape') { close(); }
 		});
 
-		document.body.appendChild(el.panel);
+		widgetRoot().appendChild(el.panel);
 		document.addEventListener('visibilitychange', onVisibility);
+	}
+
+	/* The loader's <div id="lcff-root">: every widget style is scoped to it.
+	 * Made here only if something removed it. */
+	function widgetRoot() {
+		var root = document.getElementById('lcff-root');
+		if (!root) {
+			root = mk('div');
+			root.id = 'lcff-root';
+			document.body.appendChild(root);
+		}
+		return root;
 	}
 
 	/* ---- rendering ---- */
