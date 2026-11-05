@@ -65,6 +65,11 @@ t( 'garbage is invalid', LCFF_Settings::validate_url( 'not a url', false ), arra
 t( 'http on an https site', LCFF_Settings::validate_url( 'http://help.example', true ), array( '', 'https_required' ) );
 t( 'https, trailing slash dropped', LCFF_Settings::validate_url( 'https://help.example/', true ), array( 'https://help.example', null ) );
 t( 'http on an http site', LCFF_Settings::validate_url( 'http://help.example', false ), array( 'http://help.example', null ) );
+t( 'http localhost on an https site', LCFF_Settings::validate_url( 'http://localhost:8090', true ), array( 'http://localhost:8090', null ) );
+t( 'http 127.0.0.1 on an https site', LCFF_Settings::validate_url( 'http://127.0.0.1:8090/', true ), array( 'http://127.0.0.1:8090', null ) );
+t( 'http [::1] on an https site', LCFF_Settings::validate_url( 'http://[::1]:8090', true ), array( 'http://[::1]:8090', null ) );
+t( 'localhost host is case-insensitive', LCFF_Settings::validate_url( 'http://LocalHost', true ), array( 'http://LocalHost', null ) );
+t( 'localhost.example.com is not loopback', LCFF_Settings::validate_url( 'http://localhost.example.com', true ), array( '', 'https_required' ) );
 t( 'empty is fine', LCFF_Settings::validate_url( '', true ), array( '', null ) );
 
 $secret = str_repeat( 'Ab1_-', 8 ) . 'xyz';

@@ -408,7 +408,9 @@ class LCFF_Settings {
 		if ( '' === $url ) {
 			return array( '', 'invalid' );
 		}
-		if ( $site_is_https && 'http' === $scheme ) {
+		// Browsers treat loopback hosts as secure contexts: no mixed-content block.
+		$loopback = in_array( strtolower( $host ), array( 'localhost', '127.0.0.1', '[::1]' ), true );
+		if ( $site_is_https && 'http' === $scheme && ! $loopback ) {
 			return array( '', 'https_required' );
 		}
 		return array( $url, null );
