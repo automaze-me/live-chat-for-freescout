@@ -61,12 +61,29 @@ t( 'no cookie info without wp_add_cookie_info()', $GLOBALS['lcff_cookies'], arra
 
 // Declared inside a block so PHP defines them here, not at compile time.
 if ( true ) {
-	function wp_add_cookie_info( $name, $service, $category, $expires = '', $function = '', $collected = '', $shared = '', $cookie_role = '', $purpose = '' ) {
-		$GLOBALS['lcff_cookies'][] = array( $name, $service, $category );
+	// The real signature (wp-consent-api 2.0.1, inc/api-functions.php): five required parameters.
+	function wp_add_cookie_info( $name, $plugin_or_service, $category, $expires, $function, $collected_personal_data = '', $member_cookie = false, $administrator_cookie = false, $type = 'HTTP', $domain = false ) {
+		if ( ! empty( $GLOBALS['lcff_cookie_throws'] ) ) {
+			throw new TypeError( 'wp_add_cookie_info() changed' );
+		}
+		$GLOBALS['lcff_cookies'][] = array( $name, $plugin_or_service, $category, $expires, $function, $collected_personal_data );
 	}
 }
 LCFF_Privacy::register_consent();
-t( 'lcff_logout registered as functional', $GLOBALS['lcff_cookies'], array( array( 'lcff_logout', 'Live Chat for FreeScout', 'functional' ) ) );
+t(
+	'lcff_logout registered as functional, with expiry and purpose',
+	$GLOBALS['lcff_cookies'],
+	array( array( 'lcff_logout', 'Live Chat for FreeScout', 'functional', '10 minutes', 'Tells the chat to close the conversation in this browser after you log out of this site.', '' ) )
+);
+$GLOBALS['lcff_cookie_throws'] = true;
+$threw = false;
+try {
+	LCFF_Privacy::register_consent();
+} catch ( Throwable $e ) {
+	$threw = true;
+}
+t( 'register_consent survives a failing wp_add_cookie_info()', $threw, false );
+$GLOBALS['lcff_cookie_throws'] = false;
 
 /* ---- policy text ---- */
 

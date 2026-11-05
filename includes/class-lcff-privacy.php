@@ -25,7 +25,19 @@ class LCFF_Privacy {
 	public static function register_consent() {
 		add_filter( 'wp_consent_api_registered_' . plugin_basename( LCFF_PLUGIN_FILE ), '__return_true' );
 		if ( function_exists( 'wp_add_cookie_info' ) ) {
-			wp_add_cookie_info( 'lcff_logout', self::SERVICE, 'functional' );
+			// A third-party signature change must never take the site down.
+			try {
+				wp_add_cookie_info(
+					'lcff_logout',
+					self::SERVICE,
+					'functional',
+					__( '10 minutes', 'live-chat-for-freescout' ),
+					__( 'Tells the chat to close the conversation in this browser after you log out of this site.', 'live-chat-for-freescout' ),
+					''
+				);
+			} catch ( \Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
+				unset( $e );
+			}
 		}
 	}
 

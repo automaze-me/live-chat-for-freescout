@@ -413,3 +413,11 @@ msgstr "Der Chat speichert nichts in deinem Browser, bis du eine Nachricht sende
 #: includes/class-lcff-privacy.php:49
 msgid "Add how long your help desk keeps chat conversations."
 msgstr "Ergänze, wie lange dein Helpdesk Chat-Gespräche aufbewahrt."
+
+#: includes/class-lcff-privacy.php:34
+msgid "10 minutes"
+msgstr "10 Minuten"
+
+#: includes/class-lcff-privacy.php:35
+msgid "Tells the chat to close the conversation in this browser after you log out of this site."
+msgstr "Sagt dem Chat, das Gespräch in diesem Browser zu beenden, nachdem du dich von dieser Website abgemeldet hast."
