@@ -3,7 +3,7 @@
  * Pure: no DOM, the clock is passed in. Plain ES5.
  *
  * hours = { tz: 'Europe/Berlin' | null, offset: minutes | null, days: [7 x (null | ['HH:MM','HH:MM'])] }
- * days[0] is Monday. The end of a range is exclusive.
+ * days[0] is Monday. The end of a range is exclusive; an end of '24:00' means the end of the day.
  * state(hours, nowMs) -> { open: bool, next: ms of the next opening | null }, or
  * null when it cannot be computed (unknown time zone, no Intl.formatToParts):
  * state() never throws, the caller then shows no status.

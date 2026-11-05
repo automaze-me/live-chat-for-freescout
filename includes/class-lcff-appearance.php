@@ -31,28 +31,28 @@ class LCFF_Appearance {
 		$out = array();
 
 		if ( isset( $input['team_name'] ) ) {
-			$out['team_name'] = self::cut( sanitize_text_field( (string) $input['team_name'] ), 60 );
+			$out['team_name'] = self::cut( sanitize_text_field( self::str( $input['team_name'] ) ), 60 );
 		}
 		if ( isset( $input['avatar_id'] ) ) {
-			$out['avatar_id'] = absint( $input['avatar_id'] );
+			$out['avatar_id'] = is_array( $input['avatar_id'] ) ? 0 : absint( $input['avatar_id'] );
 		}
 		if ( isset( $input['accent'] ) ) {
-			$accent         = strtolower( trim( sanitize_text_field( (string) $input['accent'] ) ) );
+			$accent         = strtolower( trim( sanitize_text_field( self::str( $input['accent'] ) ) ) );
 			$out['accent'] = 1 === preg_match( '/^#[0-9a-f]{6}$/', $accent ) ? $accent : self::DEFAULT_ACCENT;
 		}
 		if ( isset( $input['position'] ) ) {
-			$out['position'] = 'left' === $input['position'] ? 'left' : 'right';
+			$out['position'] = 'left' === self::str( $input['position'] ) ? 'left' : 'right';
 		}
 		foreach ( array( 'welcome', 'welcome_away' ) as $key ) {
 			if ( isset( $input[ $key ] ) ) {
-				$out[ $key ] = self::cut( sanitize_textarea_field( (string) $input[ $key ] ), 500 );
+				$out[ $key ] = self::cut( sanitize_textarea_field( self::str( $input[ $key ] ) ), 500 );
 			}
 		}
 		if ( isset( $input['hidden_paths'] ) ) {
-			$out['hidden_paths'] = self::normalize_paths( (string) $input['hidden_paths'] );
+			$out['hidden_paths'] = self::normalize_paths( self::str( $input['hidden_paths'] ) );
 		}
 		if ( isset( $input['privacy_url'] ) ) {
-			$out['privacy_url'] = esc_url_raw( trim( (string) $input['privacy_url'] ), array( 'http', 'https' ) );
+			$out['privacy_url'] = esc_url_raw( trim( self::str( $input['privacy_url'] ) ), array( 'http', 'https' ) );
 		}
 
 		return $out;
@@ -138,12 +138,23 @@ class LCFF_Appearance {
 		return array(
 			'accent'      => ! empty( $s['accent'] ) ? $s['accent'] : self::DEFAULT_ACCENT,
 			'position'    => ( isset( $s['position'] ) && 'left' === $s['position'] ) ? 'left' : 'right',
-			'teamName'    => ! empty( $s['team_name'] ) ? $s['team_name'] : __( 'Chat with us', 'live-chat-for-freescout' ),
+			'teamName'    => ! empty( $s['team_name'] ) ? self::decode( $s['team_name'] ) : __( 'Chat with us', 'live-chat-for-freescout' ),
 			'avatarUrl'   => $avatar,
-			'welcome'     => ! empty( $s['welcome'] ) ? $s['welcome'] : __( 'Hi! How can we help?', 'live-chat-for-freescout' ),
-			'welcomeAway' => ! empty( $s['welcome_away'] ) ? $s['welcome_away'] : __( "We're away right now. Leave a message and we'll answer by email.", 'live-chat-for-freescout' ),
+			'welcome'     => ! empty( $s['welcome'] ) ? self::decode( $s['welcome'] ) : __( 'Hi! How can we help?', 'live-chat-for-freescout' ),
+			'welcomeAway' => ! empty( $s['welcome_away'] ) ? self::decode( $s['welcome_away'] ) : __( "We're away right now. Leave a message and we'll answer by email.", 'live-chat-for-freescout' ),
 			'privacyUrl'  => $privacy,
 		);
+	}
+
+	/**
+	 * A posted value as a string; an array (or any non-scalar) becomes ''.
+	 */
+	private static function str( $v ) {
+		return is_scalar( $v ) ? (string) $v : '';
+	}
+
+	private static function decode( $v ) {
+		return html_entity_decode( (string) $v, ENT_QUOTES, 'UTF-8' );
 	}
 
 	private static function trim_slash( $path ) {

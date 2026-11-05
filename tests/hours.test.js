@@ -69,4 +69,12 @@ try {
 assert.notStrictEqual(H.state(cached, at('2026-11-04T09:00:00Z')), null, 'works again afterwards');
 assert.strictEqual(H.state(null, 0).open, false, 'no hours object');
 
+// 24:00 means the end of the day
+var late = { tz: 'Europe/Berlin', offset: null, days: [['09:00', '24:00'], ['09:00', '24:00'], ['09:00', '24:00'], ['09:00', '24:00'], ['09:00', '24:00'], ['09:00', '24:00'], ['09:00', '24:00']] };
+r = H.state(late, at('2026-11-04T22:59:00Z')); // Wed 23:59 Berlin
+assert.strictEqual(r.open, true, '23:59 open with a 24:00 end');
+r = H.state(late, at('2026-11-04T23:00:00Z')); // Thu 00:00 Berlin
+assert.strictEqual(r.open, false, '00:00 next day closed');
+assert.strictEqual(iso(r.next), '2026-11-05T08:00:00.000Z', 'next opening Thu 09:00');
+
 console.log('PASS hours');
