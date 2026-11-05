@@ -277,11 +277,33 @@ class LCFF_Identity {
 	}
 
 	/**
+	 * The key a client IP is limited under: IPv4 as is, an IPv4-mapped IPv6
+	 * address as its IPv4, any other IPv6 as its first 64 bits.
+	 *
+	 * @param string $ip Client IP.
+	 * @return string
+	 */
+	public static function ip_bucket( $ip ) {
+		$ip  = trim( (string) $ip );
+		$bin = @inet_pton( $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( false === $bin ) {
+			return $ip;
+		}
+		if ( 4 === strlen( $bin ) ) {
+			return $ip;
+		}
+		if ( 0 === strncmp( $bin, str_repeat( "\0", 10 ) . "\xff\xff", 12 ) ) {
+			return inet_ntop( substr( $bin, 12 ) );
+		}
+		return inet_ntop( substr( $bin, 0, 8 ) . str_repeat( "\0", 8 ) ) . '/64';
+	}
+
+	/**
 	 * 10 lookups per IP per 15 minutes. Only a keyed hash of the IP is used.
 	 */
 	private static function rate_limited() {
 		$ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-		$key = 'lcff_rl_' . substr( hash_hmac( 'sha256', $ip, wp_salt( 'nonce' ) ), 0, 32 );
+		$key = 'lcff_rl_' . substr( hash_hmac( 'sha256', self::ip_bucket( $ip ), wp_salt( 'nonce' ) ), 0, 32 );
 
 		$now   = time();
 		$state = get_transient( $key );

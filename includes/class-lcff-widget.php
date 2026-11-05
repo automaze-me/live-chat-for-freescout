@@ -87,6 +87,7 @@ class LCFF_Widget {
 				/* translators: %s placeholder {time} is replaced in the browser, keep it. */
 				'backToday'       => __( "Back today {time} · we'll answer by email", 'live-chat-for-freescout' ),
 				'backDay'         => __( "Back {day} {time} · we'll answer by email", 'live-chat-for-freescout' ),
+				'rateLimited'     => __( 'Too many messages in a short time. Please wait a moment.', 'live-chat-for-freescout' ),
 				'viaEmail'        => __( 'via email', 'live-chat-for-freescout' ),
 			),
 			)

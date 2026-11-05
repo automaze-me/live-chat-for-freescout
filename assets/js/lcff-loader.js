@@ -8,6 +8,11 @@
 	}
 	window.LCFF_LOADER_STARTED = true;
 	var strings = cfg.strings || {};
+	// A cached page can lack a key; the built-in English text is the fallback.
+	var DEFAULT_STRINGS = { title: 'Chat with us' };
+	function str(key) {
+		return strings[key] || DEFAULT_STRINGS[key] || '';
+	}
 
 	function storedToken() {
 		try {
@@ -81,7 +86,7 @@
 	var bubble = document.createElement('button');
 	bubble.type = 'button';
 	bubble.className = 'lcff-bubble';
-	bubble.setAttribute('aria-label', cfg.teamName || strings.title || 'Chat');
+	bubble.setAttribute('aria-label', cfg.teamName || str('title'));
 	if (/^#[0-9a-f]{6}$/i.test(cfg.accent || '')) {
 		bubble.style.setProperty('--lcff-accent', cfg.accent);
 	}

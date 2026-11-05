@@ -7,6 +7,45 @@
 		return;
 	}
 	var strings = cfg.strings || {};
+	/* English text of every string the panel reads; a cached page's LCFF_CONFIG.strings may lack keys. */
+	var DEFAULT_STRINGS = {
+		title: 'Chat with us',
+		placeholder: 'Type a message…',
+		send: 'Send',
+		close: 'Close chat',
+		retry: 'Couldn\'t send. Tap to retry.',
+		unsent: 'This message couldn\'t be sent.',
+		attach: 'Attach a file',
+		fileTooLarge: 'This file is too large (max {mb} MB).',
+		fileTooLargeNoLimit: 'This file is too large.',
+		fileType: 'Only images (JPEG, PNG, GIF, WebP) and PDF files can be sent.',
+		fileFailed: 'Couldn\'t send the file.',
+		fileLoadFailed: 'Couldn\'t load the file.',
+		askIntro: 'We usually reply within a few minutes. If you leave the page, we\'ll send the answer by email.',
+		askLabel: 'Email or order no.',
+		askLabelEmail: 'Email',
+		askOk: 'OK',
+		askLater: 'Not now',
+		askAway: 'Where should we send the answer?',
+		askThanks: 'Thanks!',
+		askEmailOnly: 'Could you leave your email address? Then we can send you the answer.',
+		askInvalid: 'Please enter a valid email address.',
+		privacy: 'Privacy policy',
+		noticeEmail: 'This conversation continues by email. The link in our email brings you back here.',
+		noticeElsewhere: 'This conversation now continues in another browser.',
+		continuePrompt: 'Continue your conversation here?',
+		continueButton: 'Continue chat',
+		continueFailed: 'This link has expired or was already used.',
+		online: 'Online · usually replies in a few minutes',
+		backToday: 'Back today {time} · we\'ll answer by email',
+		backDay: 'Back {day} {time} · we\'ll answer by email',
+		viaEmail: 'via email',
+		rateLimited: 'Too many messages in a short time. Please wait a moment.',
+		welcome: ''
+	};
+	function str(key) {
+		return strings[key] || DEFAULT_STRINGS[key] || '';
+	}
 	var API = cfg.apiBase;
 	var POLL_FAST = 3000;
 	var POLL_SLOW = 30000;
@@ -140,6 +179,18 @@
 		}
 	}
 
+	/* True once the server's latest answer said it takes X-Chat-Page (features: ["page"]). */
+	var serverTakesPage = false;
+
+	function noteFeatures(data) {
+		if (!data || typeof data !== 'object') { return; }
+		if (Array.isArray(data.features)) {
+			serverTakesPage = data.features.indexOf('page') !== -1;
+		} else if (data.identity !== undefined) {
+			serverTakesPage = false;
+		}
+	}
+
 	function rawRequest(method, path, body, token, isForm) {
 		var limit = isForm ? UPLOAD_TIMEOUT : REQUEST_TIMEOUT;
 		var timer = null;
@@ -152,7 +203,7 @@
 			if (token) { headers['X-Chat-Token'] = token; }
 			// Polls (only polls) tell the agents which page the visitor is on:
 			// the path alone, never the query or the fragment.
-			if (method === 'GET' && path.indexOf('/messages?') === 0) {
+			if (serverTakesPage && method === 'GET' && path.indexOf('/messages?') === 0) {
 				headers['X-Chat-Page'] = String(window.location.pathname || '/').slice(0, 255);
 			}
 			var init = { method: method, headers: headers, mode: 'cors', credentials: 'omit' };
@@ -177,6 +228,7 @@
 					var data = null;
 					try { data = t ? JSON.parse(t) : null; } catch (e2) {}
 					noteLimits(data);
+					noteFeatures(data);
 					return { status: res.status, data: data, hadToken: !!token, token: token || null };
 				});
 			}).then(null, function (err) {
@@ -231,19 +283,19 @@
 			// Unknown: no status line, normal welcome.
 			el.status.hidden = true;
 			el.status.textContent = '';
-			el.welcome.textContent = cfg.welcome || strings.welcome || '';
+			el.welcome.textContent = cfg.welcome || str('welcome');
 			return;
 		}
 		if (st.open) {
-			line = strings.online || '';
+			line = str('online');
 		} else if (st.next !== null) {
-			var tpl = dayKey(st.next) === dayKey(now) ? (strings.backToday || '') : (strings.backDay || '');
+			var tpl = dayKey(st.next) === dayKey(now) ? (str('backToday')) : (str('backDay'));
 			line = tpl.replace('{day}', fmt({ weekday: 'long' }, st.next))
 				.replace('{time}', fmt({ hour: 'numeric', minute: '2-digit' }, st.next));
 		}
 		el.status.textContent = line;
 		el.status.hidden = line === '';
-		var text = st.open ? (cfg.welcome || strings.welcome || '') : (cfg.welcomeAway || cfg.welcome || strings.welcome || '');
+		var text = st.open ? (cfg.welcome || str('welcome')) : (cfg.welcomeAway || cfg.welcome || str('welcome'));
 		if (el.welcome.textContent !== text) { el.welcome.textContent = text; }
 	}
 
@@ -263,7 +315,7 @@
 
 		el.panel = mk('div', 'lcff-panel');
 		el.panel.setAttribute('role', 'dialog');
-		var teamName = cfg.teamName || strings.title || '';
+		var teamName = cfg.teamName || str('title');
 		el.panel.setAttribute('aria-label', teamName || 'Chat');
 		el.panel.hidden = true;
 		if (/^#[0-9a-f]{6}$/i.test(cfg.accent || '')) {
@@ -290,14 +342,14 @@
 		header.appendChild(who);
 		el.close = mk('button', 'lcff-close', '×');
 		el.close.type = 'button';
-		el.close.setAttribute('aria-label', strings.close || 'Close');
+		el.close.setAttribute('aria-label', str('close'));
 		el.close.addEventListener('click', close);
 		header.appendChild(el.close);
 		el.panel.appendChild(header);
 
 		el.list = mk('div', 'lcff-messages');
 		el.list.setAttribute('aria-live', 'polite');
-		el.welcome = mk('div', 'lcff-welcome', cfg.welcome || strings.welcome || '');
+		el.welcome = mk('div', 'lcff-welcome', cfg.welcome || str('welcome'));
 		el.list.appendChild(el.welcome);
 		el.panel.appendChild(el.list);
 
@@ -305,20 +357,20 @@
 		el.input = mk('textarea', 'lcff-input');
 		el.input.rows = 1;
 		el.input.maxLength = 5000;
-		el.input.placeholder = strings.placeholder || '';
-		el.input.setAttribute('aria-label', strings.placeholder || 'Message');
+		el.input.placeholder = str('placeholder');
+		el.input.setAttribute('aria-label', str('placeholder'));
 		el.input.addEventListener('keydown', function (e) {
 			if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
 				e.preventDefault();
 				submit();
 			}
 		});
-		el.send = mk('button', 'lcff-send', strings.send || 'Send');
+		el.send = mk('button', 'lcff-send', str('send'));
 		el.send.type = 'submit';
 		el.attach = mk('button', 'lcff-attach');
 		el.attach.type = 'button';
-		el.attach.setAttribute('aria-label', strings.attach || 'Attach a file');
-		el.attach.title = strings.attach || 'Attach a file';
+		el.attach.setAttribute('aria-label', str('attach'));
+		el.attach.title = str('attach');
 		el.attach.appendChild(clipIcon());
 		el.file = document.createElement('input');
 		el.file.type = 'file';
@@ -337,6 +389,16 @@
 		el.fileError = mk('div', 'lcff-file-error');
 		el.fileError.setAttribute('role', 'alert');
 		el.fileError.hidden = true;
+		// Honeypot: invisible to people, tempting to form-filling bots.
+		el.hpWrap = mk('div', 'lcff-hp');
+		el.hpWrap.setAttribute('aria-hidden', 'true');
+		el.hp = document.createElement('input');
+		el.hp.type = 'text';
+		el.hp.name = 'lcff_hp';
+		el.hp.tabIndex = -1;
+		el.hp.autocomplete = 'off';
+		el.hpWrap.appendChild(el.hp);
+		el.form.appendChild(el.hpWrap);
 		el.form.appendChild(el.attach);
 		el.form.appendChild(el.file);
 		el.form.appendChild(el.input);
@@ -389,7 +451,7 @@
 		}
 		renderAttachments(n, atts);
 		if (m.via === 'email') {
-			n.appendChild(mk('div', 'lcff-via', strings.viaEmail || ''));
+			n.appendChild(mk('div', 'lcff-via', str('viaEmail')));
 		}
 		rendered[m.id] = n;
 		el.list.appendChild(n);
@@ -513,7 +575,7 @@
 			if (epoch !== viewEpoch) { return; } // the view was cleared meanwhile: nothing to report to whoever is here now
 			link.classList.remove('lcff-att--busy');
 			link.classList.add('lcff-att--failed');
-			showFileError(strings.fileLoadFailed || '');
+			showFileError(str('fileLoadFailed'));
 		});
 	}
 
@@ -577,8 +639,8 @@
 	 */
 	function updateNotice(conv) {
 		if (!built || !conv || typeof conv !== 'object' || conv.notice === undefined) { return; }
-		var text = conv.notice === 'continues_by_email' ? strings.noticeEmail
-			: conv.notice === 'continues_elsewhere' ? strings.noticeElsewhere : '';
+		var text = conv.notice === 'continues_by_email' ? str('noticeEmail')
+			: conv.notice === 'continues_elsewhere' ? str('noticeElsewhere') : '';
 		if (!text) {
 			if (noticeEl && noticeEl.parentNode) { noticeEl.parentNode.removeChild(noticeEl); }
 			noticeEl = null;
@@ -632,7 +694,7 @@
 	}
 
 	function tooLargeText() {
-		return attachMb > 0 ? (strings.fileTooLarge || '').replace('{mb}', String(attachMb)) : (strings.fileTooLargeNoLimit || '');
+		return attachMb > 0 ? (str('fileTooLarge')).replace('{mb}', String(attachMb)) : (str('fileTooLargeNoLimit'));
 	}
 
 	/* A chosen file goes out at once, as its own message, with the text typed so far. */
@@ -644,7 +706,7 @@
 		var ft = String(file.type || '').toLowerCase();
 		if (ft === 'image/jpg') { ft = 'image/jpeg'; }
 		if (ft !== '' && ATTACH_TYPES.indexOf(ft) === -1) {
-			showFileError(strings.fileType || '');
+			showFileError(str('fileType'));
 			return;
 		}
 		if (attachMb > 0 && file.size > attachMb * 1024 * 1024) {
@@ -754,6 +816,7 @@
 			if (held) { return dispatch(job); }
 			job.acct = p.acct;
 			job.login = !!p.body.login_token;
+			p.body.hp = el.hp ? el.hp.value : '';
 			if (job.file) {
 				var form = new window.FormData();
 				for (var k in p.body) {
@@ -835,7 +898,7 @@
 				} else {
 					// The server took the message but dropped the file (PHP file_uploads off): say so.
 					node.classList.add('lcff-message--rejected');
-					node.appendChild(mk('div', 'lcff-unsent', strings.fileFailed || ''));
+					node.appendChild(mk('div', 'lcff-unsent', str('fileFailed')));
 				}
 			}
 			noteLogin(job.login, r.data.identity);
@@ -860,6 +923,11 @@
 		if (r.status === 401 && r.hadToken) {
 			unauthorized(r.token);
 		}
+		if (r.status === 429) {
+			// Rate limited: the message stays, tapping it tries again later.
+			fail(job, true, str('rateLimited'));
+			return;
+		}
 		// 409 (same id, different text; or a token taken elsewhere) and 422
 		// (invalid input) come back identically on every retry.
 		if (job.file) {
@@ -868,9 +936,9 @@
 				why = tooLargeText();
 			} else if (r.status === 422 && r.data && r.data.field === 'file') {
 				why = r.data.reason === 'too_large' ? tooLargeText()
-					: r.data.reason === 'type' ? (strings.fileType || '') : (strings.fileFailed || '');
+					: r.data.reason === 'type' ? (str('fileType')) : (str('fileFailed'));
 			} else if (r.status === 422) {
-				why = strings.fileFailed || '';
+				why = str('fileFailed');
 			}
 			if (why !== null) {
 				fail(job, false, why);
@@ -911,14 +979,14 @@
 			node.classList.add('lcff-message--rejected');
 			node.removeAttribute('role');
 			node.removeAttribute('tabindex');
-			node.appendChild(mk('div', 'lcff-unsent', message || strings.unsent || ''));
+			node.appendChild(mk('div', 'lcff-unsent', message || str('unsent')));
 			return;
 		}
 
 		node.classList.add('lcff-message--failed');
 		node.setAttribute('role', 'button');
 		node.setAttribute('tabindex', '0');
-		node.appendChild(mk('div', 'lcff-retry', job.file ? (strings.fileFailed || '') : (strings.retry || '')));
+		node.appendChild(mk('div', 'lcff-retry', message || (job.file ? str('fileFailed') : str('retry'))));
 		var retry = function () { enqueue(job); };
 		node.onclick = retry;
 		node.onkeydown = function (e) {
@@ -1063,6 +1131,7 @@
 			} else if (r.status === 401) {
 				unauthorized(r.token);
 			}
+			// 429 and the rest: the ids stay pending for the next try.
 		}, function () {
 			if (mySeq === seenSeq) { seenInFlight = false; }
 		});
@@ -1555,9 +1624,9 @@
 		if (away) {
 			card.className = 'lcff-ask lcff-ask-away';
 		} else {
-			card.appendChild(mk('div', 'lcff-ask-intro', canOrder ? (strings.askIntro || '') : (strings.askEmailOnly || '')));
+			card.appendChild(mk('div', 'lcff-ask-intro', canOrder ? (str('askIntro')) : (str('askEmailOnly'))));
 		}
-		var label = mk('label', 'lcff-ask-label', away ? (strings.askAway || '') : (canOrder ? (strings.askLabel || '') : (strings.askLabelEmail || '')));
+		var label = mk('label', 'lcff-ask-label', away ? (str('askAway')) : (canOrder ? (str('askLabel')) : (str('askLabelEmail'))));
 		label.setAttribute('for', id);
 		card.appendChild(label);
 		var input = mk('input', 'lcff-ask-input');
@@ -1565,7 +1634,7 @@
 		input.type = canOrder ? 'text' : 'email';
 		input.maxLength = 254;
 		input.autocomplete = canOrder ? 'off' : 'email';
-		if (away) { input.placeholder = canOrder ? (strings.askLabel || '') : (strings.askLabelEmail || ''); }
+		if (away) { input.placeholder = canOrder ? (str('askLabel')) : (str('askLabelEmail')); }
 		card.appendChild(input);
 		var error = mk('div', 'lcff-ask-error');
 		error.setAttribute('role', 'alert');
@@ -1573,16 +1642,16 @@
 		card.appendChild(error);
 
 		var row = mk('div', 'lcff-ask-actions');
-		var ok = mk('button', 'lcff-ask-ok', strings.askOk || 'OK');
+		var ok = mk('button', 'lcff-ask-ok', str('askOk'));
 		ok.type = 'submit';
-		var later = mk('button', 'lcff-ask-later', strings.askLater || '');
+		var later = mk('button', 'lcff-ask-later', str('askLater'));
 		later.type = 'button';
 		row.appendChild(ok);
 		row.appendChild(later);
 		card.appendChild(row);
 		var url = typeof cfg.privacyUrl === 'string' ? cfg.privacyUrl : '';
 		if (/^https?:\/\//i.test(url)) {
-			var link = mk('a', 'lcff-ask-privacy', strings.privacy || 'Privacy policy');
+			var link = mk('a', 'lcff-ask-privacy', str('privacy'));
 			link.href = url;
 			link.target = '_blank';
 			link.rel = 'noopener';
@@ -1596,7 +1665,7 @@
 				// The box comes back; the thanks stays in the conversation.
 				removeAsk();
 				var done = mk('div', 'lcff-ask lcff-ask--done', '');
-				done.appendChild(mk('div', 'lcff-ask-thanks', strings.askThanks || ''));
+				done.appendChild(mk('div', 'lcff-ask-thanks', str('askThanks')));
 				el.list.appendChild(done);
 				askCard = done;
 				scrollDown();
@@ -1604,7 +1673,7 @@
 			}
 			while (card.firstChild) { card.removeChild(card.firstChild); }
 			card.className = 'lcff-ask lcff-ask--done';
-			card.appendChild(mk('div', 'lcff-ask-thanks', strings.askThanks || ''));
+			card.appendChild(mk('div', 'lcff-ask-thanks', str('askThanks')));
 		};
 		var settle = function (resolved) {
 			if (busy === false || myGen !== gen || askCard !== card) { return; }
@@ -1649,8 +1718,13 @@
 						settle(true);
 					} else if (r.status === 409) {
 						settle(true);
-					} else if (r.status === 422) {
-						error.textContent = strings.askInvalid || '';
+					} else if (r.status === 422 || r.status === 403) {
+						error.textContent = str('askInvalid');
+						error.hidden = false;
+						release();
+					} else if (r.status === 429) {
+						// The typed value stays in the box.
+						error.textContent = str('rateLimited');
 						error.hidden = false;
 						release();
 					} else {
@@ -1661,6 +1735,7 @@
 			}
 			orderToken(v, chat).then(function (token) {
 				if (myGen !== gen || askCard !== card) { return null; }
+				if (token === 'limited') { return { status: 429, data: null }; }
 				if (!token) { return { status: 0, data: null }; }
 				return request('POST', '/identity', { order_token: token }, chat).then(function (r) { return r; }, function () {
 					return { status: 0, data: null };
@@ -1668,6 +1743,13 @@
 			}).then(function (r) {
 				if (!r || myGen !== gen || askCard !== card) { return; }
 				done(r);
+				if (r.status === 429) {
+					error.textContent = str('rateLimited');
+					error.hidden = false;
+					release();
+					return;
+				}
+				// A 403 counts as "not resolved": the same "Thanks!" as any other miss.
 				var resolved = r.status === 409;
 				if (r.status === 200 && r.data) {
 					noteIdentity(r.data.identity);
@@ -1694,7 +1776,7 @@
 	/*
 	 * Asks WordPress (same origin, with its cookies) to look the order up. The
 	 * answer is an encrypted token bound to `chat`, whether or not the order
-	 * exists. Resolves to the token, or null on any failure. Never rejects.
+	 * exists. Resolves to the token, 'limited' when WordPress answered 429, or null on any failure. Never rejects.
 	 */
 	function orderToken(number, chat) {
 		return sha256hex(chat).then(function (bind) {
@@ -1722,6 +1804,7 @@
 					clear();
 					var d = null;
 					try { d = JSON.parse(t); } catch (e2) {}
+					if (res.status === 429) { return 'limited'; }
 					return res.ok && d && typeof d.token === 'string' && d.token.indexOf('v1.') === 0 ? d.token : null;
 				});
 			}).then(null, function () {
@@ -1776,6 +1859,7 @@
 				unauthorized(r.token);
 				return redeem(link, true);
 			}
+			if (r.status === 429) { return 'rate_limited'; }
 			return 'error';
 		}, function () { return 'error'; });
 	}
@@ -1801,12 +1885,12 @@
 		var link = pendingContinue;
 		if (continueCard && continueCard.parentNode) { continueCard.parentNode.removeChild(continueCard); }
 		var card = mk('div', 'lcff-ask lcff-continue');
-		card.appendChild(mk('div', 'lcff-ask-intro', strings.continuePrompt || ''));
-		var failed = mk('div', 'lcff-ask-error', strings.continueFailed || '');
+		card.appendChild(mk('div', 'lcff-ask-intro', str('continuePrompt')));
+		var failed = mk('div', 'lcff-ask-error', str('continueFailed'));
 		failed.setAttribute('role', 'alert');
 		failed.hidden = true;
 		var row = mk('div', 'lcff-ask-actions');
-		var go = mk('button', 'lcff-ask-ok lcff-continue-go', strings.continueButton || 'Continue');
+		var go = mk('button', 'lcff-ask-ok lcff-continue-go', str('continueButton'));
 		go.type = 'button';
 		row.appendChild(go);
 		card.appendChild(failed);
@@ -1821,6 +1905,7 @@
 				if (outcome === 'ok' || outcome === 'invalid') { pendingContinue = null; }
 				if (outcome === 'ok') { return; } // clearView() removed the card
 				busy = false;
+				failed.textContent = outcome === 'rate_limited' ? str('rateLimited') : str('continueFailed');
 				failed.hidden = false;
 				if (outcome === 'invalid') {
 					row.style.display = 'none'; // a spent link stays spent
