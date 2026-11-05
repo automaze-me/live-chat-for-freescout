@@ -64,7 +64,7 @@ Yes. The chat loads in the visitor's browser and talks to FreeScout directly, so
 
 = Does it set cookies? =
 
-Almost never. The chat stores nothing in the browser until a visitor sends a message. The only cookie is a short-lived one set when a logged-in visitor logs out of your site. See the Privacy section for what the plugin stores and sends.
+Almost never. The chat stores nothing in the browser until a visitor uses it: sends a message, continues a chat from an email link, or, when logged in with an existing conversation, opens the chat. The only cookie is a short-lived one set when a logged-in visitor logs out of your site. See the Privacy section for what the plugin stores and sends.
 
 = What happens outside working hours? =
 
@@ -87,7 +87,7 @@ When a visitor uses the chat, their browser talks directly to the FreeScout addr
 * The path of the page the visitor is viewing (without query string or fragment), while a conversation is open, so your team sees where the visitor is.
 * A random chat token that identifies the conversation in the browser.
 
-Showing the bubble sends nothing to FreeScout, and a conversation is created only when the visitor sends a message. Once a visitor has a conversation, the browser also talks to FreeScout to fetch replies, mark replies as read, download attachments, continue the chat from an email link and recognize a logged-in account. After a WordPress logout, the chat tells FreeScout to close that browser's chat, even before the panel is opened.
+Showing the bubble to a new visitor sends nothing to FreeScout, and a conversation is created only when the visitor sends a message. A returning visitor with a stored chat token resumes the chat as the page loads. When a logged-in visitor opens the chat, the browser asks FreeScout whether the account already has conversations, which sends the signed account details (user ID, name and email address). Once a visitor has a conversation, the browser also talks to FreeScout to fetch replies, mark replies as read, download attachments, continue the chat from an email link and recognize a logged-in account. After a WordPress logout, the chat tells FreeScout to close that browser's chat, even before the panel is opened.
 
 Like any web server, your FreeScout server receives the visitor's IP address and browser user agent with each of these requests.
 
@@ -97,7 +97,7 @@ Like any web server, your FreeScout server receives the visitor's IP address and
 
 **Logged-in visitors and orders**
 
-If a secret is saved in the settings, your WordPress server signs the identity of a logged-in visitor, and the browser passes it to FreeScout: the WordPress user ID, display name and email address. If WooCommerce is active and a visitor enters an order number, your server looks the order up and the browser passes the order number, the order's email address and the customer's name to FreeScout, so your team sees which order the visitor means.
+If a secret is saved in the settings, your WordPress server signs the identity of a logged-in visitor, and the browser passes it to FreeScout when the visitor opens the chat: the WordPress user ID, display name and email address. If WooCommerce is active and a visitor enters an order number, your server looks the order up and the browser passes the order number, the order's email address and the customer's name to FreeScout, so your team sees which order the visitor means.
 
 **Who is behind it**
 
@@ -107,7 +107,7 @@ FreeScout is software that you or your host operates, so its terms and privacy p
 
 **What the plugin stores in the browser**
 
-Nothing is stored until a visitor sends a message. Showing the bubble stores nothing. After the first message the chat stores:
+Nothing is stored until a visitor uses the chat: sends a message, continues a conversation from an email link, or, while logged in, opens the chat when the account already has conversations. Showing the bubble to a new visitor stores nothing. After that the chat stores:
 
 * `localStorage` `lcff_token`: the random chat token that continues the conversation on other pages.
 * `localStorage` `lcff_seen`: the number of the last reply the visitor has seen.
@@ -116,7 +116,7 @@ Nothing is stored until a visitor sends a message. Showing the bubble stores not
 * `sessionStorage` `lcff_page`: a per-tab setting for the page address feature, deleted when the tab closes.
 * Cookie `lcff_logout` (10 minutes): set by your WordPress site when a user logs out, so the chat closes the conversation in that browser. It is not tracking, and it is not set for anyone else.
 
-The chat registers itself with the WP Consent API as functional, so consent plugins can list the cookie. Because nothing is stored before a visitor chooses to write a message, the plugin does not show a consent banner of its own.
+The chat registers itself with the WP Consent API as functional, so consent plugins can list the cookie. Because nothing is stored before a visitor chooses to use the chat, the plugin does not show a consent banner of its own.
 
 **What WordPress stores**
 

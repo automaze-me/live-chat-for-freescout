@@ -99,7 +99,7 @@ t( 'policy has the tutorial paragraph', false !== strpos( $text, '<p class="priv
 t( 'policy has no stray %s', false === strpos( $text, '%s' ), true );
 t(
 	'policy says what the chat stores',
-	false !== strpos( html_entity_decode( $text, ENT_QUOTES, 'UTF-8' ), "The chat stores nothing in your browser until you send a message. Then it keeps a random chat token and a few small settings in your browser's storage" ),
+	false !== strpos( html_entity_decode( $text, ENT_QUOTES, 'UTF-8' ), "The chat stores nothing in your browser until you use it: you send a message, you continue a conversation from an email link, or, if you are logged in and your account already has conversations, you open the chat. Then it keeps a random chat token and a few small settings in your browser's storage" ),
 	true
 );
 

@@ -52,10 +52,10 @@ class LCFF_Privacy {
 		$host     = is_string( $host ) ? $host : '';
 
 		/* translators: %s: the host name of the FreeScout help desk, e.g. help.example.com. */
-		$flow = sprintf( __( 'When you use the chat on this site, your messages and the files you attach go to our help desk at %s. So does an email address or order number you enter in the chat; with an order number, the help desk also receives the order\'s email address and name. While a conversation is open, the chat sends the path of the page you are viewing. If you are logged in, the chat tells the help desk your account\'s user ID, name and email address.', 'live-chat-for-freescout' ), $host );
+		$flow = sprintf( __( 'When you use the chat on this site, your messages and the files you attach go to our help desk at %s. So does an email address or order number you enter in the chat; with an order number, the help desk also receives the order\'s email address and name. While a conversation is open, the chat sends the path of the page you are viewing. If you are logged in, the chat tells the help desk your account\'s user ID, name and email address as soon as you open it.', 'live-chat-for-freescout' ), $host );
 		$flow = esc_html( $flow );
 
-		$storage = esc_html( __( 'The chat stores nothing in your browser until you send a message. Then it keeps a random chat token and a few small settings in your browser\'s storage (`lcff_token`, `lcff_seen`, `lcff_ask`, `lcff_acct`, `lcff_page`), so the conversation continues on other pages. When you log out of this site, a cookie (`lcff_logout`, 10 minutes) tells the chat to close the conversation in this browser.', 'live-chat-for-freescout' ) );
+		$storage = esc_html( __( 'The chat stores nothing in your browser until you use it: you send a message, you continue a conversation from an email link, or, if you are logged in and your account already has conversations, you open the chat. Then it keeps a random chat token and a few small settings in your browser\'s storage (`lcff_token`, `lcff_seen`, `lcff_ask`, `lcff_acct`, `lcff_page`), so the conversation continues on other pages and resumes when you return. When you log out of this site, a cookie (`lcff_logout`, 10 minutes) tells the chat to close the conversation in this browser.', 'live-chat-for-freescout' ) );
 		$storage = preg_replace( '/`([^`]+)`/', '<code>$1</code>', $storage );
 
 		return '<p class="privacy-policy-tutorial">' . esc_html( __( 'Add how long your help desk keeps chat conversations.', 'live-chat-for-freescout' ) ) . '</p>'

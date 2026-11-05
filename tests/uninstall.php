@@ -95,7 +95,7 @@ t( 'single: no site switching', array_merge( lcff_only( $log, 'switch' ), lcff_o
 $GLOBALS['multisite'] = true;
 $GLOBALS['sites']     = array( 1, 2, 3 );
 $log                  = lcff_run_uninstall();
-t( 'network: get_sites asks for ids', lcff_only( $log, 'get_sites' ), array( array( 'get_sites', array( 'fields' => 'ids' ) ) ) );
+t( 'network: get_sites asks for ids', lcff_only( $log, 'get_sites' ), array( array( 'get_sites', array( 'fields' => 'ids', 'number' => 0 ) ) ) );
 t( 'network: three switches', array_column( lcff_only( $log, 'switch' ), 1 ), array( 1, 2, 3 ) );
 t( 'network: every switch restored', count( lcff_only( $log, 'restore' ) ), 3 );
 t( 'network: back on the original site', $GLOBALS['current'], 1 );
