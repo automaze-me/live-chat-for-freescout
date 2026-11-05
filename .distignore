@@ -1,0 +1,10 @@
+.git
+.github
+.gitattributes
+.gitignore
+.distignore
+tests
+tools
+node_modules
+*.zip
+.DS_Store

@@ -517,5 +517,91 @@ foreach ( array( 'de_DE', 'de_DE_formal' ) as $locale ) {
 	t( "$locale.mo askAway is the .po's", isset( $mo[ $ask ] ) ? $mo[ $ask ] : null, $str );
 }
 
+/* ---- 6. Austrian and Swiss German, generated from the two sources (Ruling P4) ---- */
+
+$generated = array(
+	// locale => array( source, ß becomes ss, form of address )
+	'de_AT'          => array( 'de_DE', false, 'du' ),
+	'de_CH'          => array( 'de_DE_formal', true, 'Sie' ),
+	'de_CH_informal' => array( 'de_DE', true, 'du' ),
+);
+foreach ( $generated as $locale => $def ) {
+	list( $source, $ss, $form ) = $def;
+	$file = "$langs/live-chat-for-freescout-$locale.po";
+	$po   = lcff_po_parse( $file );
+	t( "$locale.po exists", is_array( $po ), true );
+	$po  = is_array( $po ) ? $po : array();
+	$src = lcff_po_parse( "$langs/live-chat-for-freescout-$source.po" );
+	$src = is_array( $src ) ? $src : array();
+	$raw = (string) @file_get_contents( $file );
+	t(
+		"$locale.po starts with the generator comment",
+		0 === strpos( $raw, "# Generated from live-chat-for-freescout-$source.po by tools/derive-locales.php. Do not edit.\n" ),
+		true
+	);
+	$h = lcff_po_header( $po );
+	t( "$locale.po Language", isset( $h['Language'] ) ? $h['Language'] : null, $locale );
+	$src_h = lcff_po_header( $src );
+	unset( $h['Language'], $src_h['Language'] );
+	t( "$locale.po keeps the other headers", $h, $src_h );
+	t( "$locale.po msgids equal $source's, in order", array_keys( $po ), array_keys( $src ) );
+	$diff = array();
+	foreach ( $src as $id => $e ) {
+		if ( '' === $id || ! isset( $po[ $id ] ) ) {
+			continue;
+		}
+		$want = $e['msgstr'];
+		if ( $ss ) {
+			$want = str_replace( array( 'ß', 'ẞ' ), array( 'ss', 'SS' ), $want );
+		}
+		if ( $po[ $id ]['msgstr'] !== $want ) {
+			$diff[] = $id;
+		}
+	}
+	t( "$locale.po msgstr equals $source's after the transform", $diff, array() );
+	if ( $ss ) {
+		t( "$locale.po has no ß", false !== strpos( $raw, 'ß' ) || false !== strpos( $raw, 'ẞ' ), false );
+	}
+	$bad = array();
+	foreach ( $po as $id => $e ) {
+		if ( '' === $id ) {
+			continue;
+		}
+		$str = $e['msgstr'][0];
+		if ( 'du' === $form && preg_match( $sie_words, $str ) ) {
+			$bad[] = "formal address in a du file: \"$str\"";
+		}
+		if ( 'Sie' === $form && preg_match( $du_words, $str ) ) {
+			$bad[] = "informal address in a Sie file: \"$str\"";
+		}
+	}
+	t( "$locale.po keeps the $form form", $bad, array() );
+	$ask = 'Where should we send the answer?';
+	$str = isset( $po[ $ask ]['msgstr'][0] ) ? $po[ $ask ]['msgstr'][0] : '';
+	if ( 'du' === $form ) {
+		t( "$locale askAway says du", 1 === preg_match( $du_words, $str ) && 0 === preg_match( $sie_words, $str ), true );
+	} else {
+		t( "$locale askAway says Sie", 1 === preg_match( $sie_words, $str ) && 0 === preg_match( $du_words, $str ), true );
+	}
+
+	$mo = lcff_mo_parse( "$langs/live-chat-for-freescout-$locale.mo" );
+	t( "$locale.mo exists and parses", is_array( $mo ), true );
+	$mo       = is_array( $mo ) ? $mo : array();
+	$mismatch = array();
+	foreach ( $po as $id => $e ) {
+		if ( '' === $id ) {
+			continue;
+		}
+		if ( ! isset( $mo[ $id ] ) || $mo[ $id ] !== implode( "\0", $e['msgstr'] ) ) {
+			$mismatch[] = $id;
+		}
+	}
+	t( "$locale.mo matches the .po (recompile with msgfmt)", $mismatch, array() );
+	t( "$locale.mo has no extra strings", count( array_diff( array_keys( $mo ), array_keys( $po ), array( '' ) ) ), 0 );
+}
+t( 'js_locale de_AT', LCFF_Widget::js_locale( 'de_AT' ), 'de-AT' );
+t( 'js_locale de_CH', LCFF_Widget::js_locale( 'de_CH' ), 'de-CH' );
+t( 'js_locale de_CH_informal', LCFF_Widget::js_locale( 'de_CH_informal' ), 'de-CH' );
+
 echo $ok ? "PASS\n" : "FAIL\n";
 exit( $ok ? 0 : 1 );
