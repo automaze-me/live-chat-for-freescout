@@ -258,7 +258,7 @@
 	/* ---- working hours ---- */
 	var hoursTimer = null;
 
-	/* Day and time names in the WordPress locale, the language of the texts around them; <html lang> only for a config without it (a page cached before the update). */
+	/* Day and time names in the WordPress locale; <html lang> only for a config without it (a page cached before the update). The texts around them are in that language only when the plugin has a translation for the locale: a site in a locale without one (e.g. fr_FR, de_AT, de_CH) shows English sentences with localized day names. */
 	function fmt(opts, ms) {
 		var lang = cfg.locale || document.documentElement.lang || undefined;
 		try {

@@ -414,8 +414,40 @@ foreach ( $pot_ids as $id ) {
 
 /* ---- 5. both German files ---- */
 
-$du_words  = '/\b(?:du|dir|dich|dein|deine|deinen|deinem|deiner|deines)\b/iu';
+// du: the pronouns, and the imperatives the de_DE file uses, at a sentence start or after "Bitte"
+// (so the noun "Versuche" in the middle of a sentence is not one).
+$du_words  = '/\b(?:du|dir|dich|dein|deine|deinen|deinem|deiner|deines)\b'
+	. '|(?:^|[.!?:]\s+|\bBitte\s+)(?:Chatte|Hinterlasse|Speichere|Kopiere|Korrigiere|Überprüfe|Versuche|Lass|Füge|Tippe|Gib|Warte)\b/iu';
 $sie_words = '/\b(?:Sie|Ihnen|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres)\b/u';
+
+// The du pattern also knows the de_DE file's imperatives, which carry no pronoun.
+foreach ( array(
+	'Chatte mit uns',
+	'Wir sind weg. Hinterlasse uns eine Nachricht.',
+	'Speichere zuerst die FreeScout-URL.',
+	'Kopiere den geheimen Schlüssel erneut.',
+	'Korrigiere die Adresse.',
+	'Überprüfe sie unter Verwalten → Website-Chat.',
+	'Zu viele Tests. Versuche es in einer Minute erneut.',
+	'Lass das Feld leer.',
+	'Füge ihn erneut aus FreeScout ein.',
+	'Nicht gesendet. Tippe, um es erneut zu versuchen.',
+	'Bitte gib eine gültige E-Mail-Adresse ein.',
+	'Bitte warte einen Moment.',
+) as $sample ) {
+	t( "du pattern catches \"$sample\"", preg_match( $du_words, $sample ), 1 );
+}
+foreach ( array(
+	'Zu viele Versuche in kurzer Zeit.',
+	'Versuchen Sie es in einer Minute erneut.',
+	'Lassen Sie das Feld leer.',
+	'Bitte warten Sie einen Moment.',
+	'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
+	'Wartezeit bis zum Versand',
+	'Nicht gesendet. Zum erneuten Senden antippen.',
+) as $sample ) {
+	t( "du pattern leaves \"$sample\" alone", preg_match( $du_words, $sample ), 0 );
+}
 
 foreach ( array( 'de_DE', 'de_DE_formal' ) as $locale ) {
 	$po = lcff_po_parse( "$langs/live-chat-for-freescout-$locale.po" );

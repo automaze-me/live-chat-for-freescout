@@ -55,7 +55,9 @@ class LCFF_Widget {
 			'identity'   => $identity,
 			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 			'woo'        => $identity && function_exists( 'wc_get_order' ),
-			// Day and time names in the header use the language of these strings, not <html lang>.
+			// Day and time names in the header follow the WordPress locale, not <html lang>. They match the language of these
+			// strings only when a translation for that locale is loaded: a locale without one (e.g. fr_FR, de_AT, de_CH) gets
+			// English sentences with localized day names.
 			'locale'     => self::js_locale( determine_locale() ),
 			'strings'  => array(
 				'title'       => __( 'Chat with us', 'live-chat-for-freescout' ),
@@ -97,7 +99,8 @@ class LCFF_Widget {
 			)
 		);
 
-		wp_add_inline_script( 'lcff-loader', 'window.LCFF_CONFIG = ' . wp_json_encode( $config ) . ';', 'before' );
+		// The admin texts are decoded: no raw < > & may reach the inline script ("<!--<script" would keep it open).
+		wp_add_inline_script( 'lcff-loader', 'window.LCFF_CONFIG = ' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );
 	}
 
 	/**

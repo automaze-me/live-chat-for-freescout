@@ -29,7 +29,7 @@ msgid "Adds a live chat bubble to your site that delivers visitor messages to yo
 msgstr "Fügt Ihrer Website einen Live-Chat-Button hinzu und leitet die Nachrichten der Besucher an Ihren FreeScout-Helpdesk weiter."
 
 #: includes/class-lcff-appearance.php:141
-#: includes/class-lcff-widget.php:61
+#: includes/class-lcff-widget.php:63
 msgid "Chat with us"
 msgstr "Chatten Sie mit uns"
 
@@ -112,7 +112,7 @@ msgstr "Website-ID"
 
 #: includes/class-lcff-settings.php:160
 msgid "The 32-character site ID, shown in FreeScout under Manage → Website Chat when you open your website."
-msgstr "Die 32-stellige Website-ID. FreeScout zeigt sie unter Verwalten → Website-Chat an, wenn Sie Ihre Website öffnen."
+msgstr "Die 32-stellige Website-ID. FreeScout zeigt sie unter Verwalten → Website-Chat an, wenn Sie dort Ihre Website öffnen."
 
 #: includes/class-lcff-settings.php:166
 msgid "Secret"
@@ -148,7 +148,7 @@ msgstr "Begrüßungsnachricht"
 
 #: includes/class-lcff-settings.php:191
 msgid "Welcome message (away)"
-msgstr "Begrüßungsnachricht (nicht erreichbar)"
+msgstr "Begrüßungsnachricht (außerhalb der Servicezeiten)"
 
 #: includes/class-lcff-settings.php:192
 msgid "Hide on pages"
@@ -189,7 +189,7 @@ msgstr "bis"
 #: includes/class-lcff-settings.php:242
 #, php-format
 msgid "Times use the site's timezone (%s)."
-msgstr "Die Zeiten gelten in der Zeitzone der Website (%s)."
+msgstr "Die Zeiten beziehen sich auf die Zeitzone der Website (%s)."
 
 #: includes/class-lcff-settings.php:267
 msgid "Remove"
@@ -225,177 +225,177 @@ msgstr "Der geheime Schlüssel muss aus 43 Zeichen bestehen: Buchstaben, Ziffern
 msgid "Working hours for %s: the end must be later than the start. The day was saved as closed."
 msgstr "Servicezeiten am %s: Das Ende muss nach dem Beginn liegen. Der Tag wurde als geschlossen gespeichert."
 
-#: includes/class-lcff-settings.php:429
+#: includes/class-lcff-settings.php:438
 msgid "Monday"
 msgstr "Montag"
 
-#: includes/class-lcff-settings.php:430
+#: includes/class-lcff-settings.php:439
 msgid "Tuesday"
 msgstr "Dienstag"
 
-#: includes/class-lcff-settings.php:431
+#: includes/class-lcff-settings.php:440
 msgid "Wednesday"
 msgstr "Mittwoch"
 
-#: includes/class-lcff-settings.php:432
+#: includes/class-lcff-settings.php:441
 msgid "Thursday"
 msgstr "Donnerstag"
 
-#: includes/class-lcff-settings.php:433
+#: includes/class-lcff-settings.php:442
 msgid "Friday"
 msgstr "Freitag"
 
-#: includes/class-lcff-settings.php:434
+#: includes/class-lcff-settings.php:443
 msgid "Saturday"
 msgstr "Samstag"
 
-#: includes/class-lcff-settings.php:435
+#: includes/class-lcff-settings.php:444
 msgid "Sunday"
 msgstr "Sonntag"
 
-#: includes/class-lcff-settings.php:503
+#: includes/class-lcff-settings.php:512
 msgid "Saved — leave blank to keep"
 msgstr "Gespeichert – zum Beibehalten leer lassen"
 
-#: includes/class-lcff-settings.php:514
+#: includes/class-lcff-settings.php:523
 msgid "The saved secret is not valid. Paste it again from FreeScout."
 msgstr "Der gespeicherte geheime Schlüssel ist ungültig. Fügen Sie ihn erneut aus FreeScout ein."
 
-#: includes/class-lcff-settings.php:521
+#: includes/class-lcff-settings.php:530
 msgid "Remove the saved secret"
 msgstr "Gespeicherten geheimen Schlüssel entfernen"
 
-#: includes/class-lcff-settings.php:524
+#: includes/class-lcff-settings.php:533
 msgid "This server's PHP can't encrypt with AES-256-GCM (OpenSSL), so logged-in visitors and order numbers can't be recognized."
-msgstr "PHP auf diesem Server kann nicht mit AES-256-GCM (OpenSSL) verschlüsseln, daher können angemeldete Besucher und Bestellnummern nicht erkannt werden."
+msgstr "Das PHP auf diesem Server kann nicht mit AES-256-GCM (OpenSSL) verschlüsseln, daher können angemeldete Besucher und Bestellnummern nicht erkannt werden."
 
-#: includes/class-lcff-settings.php:544
+#: includes/class-lcff-settings.php:553
 msgid "Test connection"
 msgstr "Verbindung testen"
 
-#: includes/class-lcff-widget.php:62
+#: includes/class-lcff-widget.php:64
 msgid "Type a message…"
 msgstr "Nachricht schreiben …"
 
-#: includes/class-lcff-widget.php:63
+#: includes/class-lcff-widget.php:65
 msgid "Send"
 msgstr "Senden"
 
-#: includes/class-lcff-widget.php:64
+#: includes/class-lcff-widget.php:66
 msgid "Close chat"
 msgstr "Chat schließen"
 
-#: includes/class-lcff-widget.php:65
+#: includes/class-lcff-widget.php:67
 msgid "Couldn't send. Tap to retry."
-msgstr "Nicht gesendet. Tippen Sie, um es erneut zu versuchen."
+msgstr "Nicht gesendet. Zum erneuten Senden antippen."
 
-#: includes/class-lcff-widget.php:66
+#: includes/class-lcff-widget.php:68
 msgid "This message couldn't be sent."
 msgstr "Diese Nachricht konnte nicht gesendet werden."
 
-#: includes/class-lcff-widget.php:67
+#: includes/class-lcff-widget.php:69
 msgid "Attach a file"
 msgstr "Datei anhängen"
 
 #. translators: {mb} is replaced in the browser with the size limit in megabytes, e.g. 10. Keep {mb} as it is.
-#: includes/class-lcff-widget.php:69
+#: includes/class-lcff-widget.php:71
 msgid "This file is too large (max {mb} MB)."
 msgstr "Diese Datei ist zu groß (max. {mb} MB)."
 
-#: includes/class-lcff-widget.php:70
+#: includes/class-lcff-widget.php:72
 msgid "This file is too large."
 msgstr "Diese Datei ist zu groß."
 
-#: includes/class-lcff-widget.php:71
+#: includes/class-lcff-widget.php:73
 msgid "Only images (JPEG, PNG, GIF, WebP) and PDF files can be sent."
 msgstr "Es können nur Bilder (JPEG, PNG, GIF, WebP) und PDF-Dateien gesendet werden."
 
-#: includes/class-lcff-widget.php:72
+#: includes/class-lcff-widget.php:74
 msgid "Couldn't send the file."
 msgstr "Die Datei konnte nicht gesendet werden."
 
-#: includes/class-lcff-widget.php:73
+#: includes/class-lcff-widget.php:75
 msgid "Couldn't load the file."
 msgstr "Die Datei konnte nicht geladen werden."
 
-#: includes/class-lcff-widget.php:74
+#: includes/class-lcff-widget.php:76
 msgid "We usually reply within a few minutes. If you leave the page, we'll send the answer by email."
 msgstr "Wir antworten meist innerhalb weniger Minuten. Wenn Sie die Seite verlassen, schicken wir Ihnen die Antwort per E-Mail."
 
-#: includes/class-lcff-widget.php:75
+#: includes/class-lcff-widget.php:77
 msgid "Email or order no."
 msgstr "E-Mail oder Bestellnr."
 
-#: includes/class-lcff-widget.php:76
+#: includes/class-lcff-widget.php:78
 msgid "Email"
 msgstr "E-Mail"
 
-#: includes/class-lcff-widget.php:77
+#: includes/class-lcff-widget.php:79
 msgid "OK"
 msgstr "OK"
 
-#: includes/class-lcff-widget.php:78
+#: includes/class-lcff-widget.php:80
 msgid "Not now"
 msgstr "Jetzt nicht"
 
-#: includes/class-lcff-widget.php:79
+#: includes/class-lcff-widget.php:81
 msgid "Where should we send the answer?"
 msgstr "Wohin sollen wir Ihnen die Antwort schicken?"
 
-#: includes/class-lcff-widget.php:80
+#: includes/class-lcff-widget.php:82
 msgid "Thanks!"
 msgstr "Danke!"
 
-#: includes/class-lcff-widget.php:81
+#: includes/class-lcff-widget.php:83
 msgid "Could you leave your email address? Then we can send you the answer."
 msgstr "Möchten Sie uns Ihre E-Mail-Adresse hinterlassen? Dann können wir Ihnen die Antwort schicken."
 
-#: includes/class-lcff-widget.php:82
+#: includes/class-lcff-widget.php:84
 msgid "Please enter a valid email address."
 msgstr "Bitte geben Sie eine gültige E-Mail-Adresse ein."
 
-#: includes/class-lcff-widget.php:83
+#: includes/class-lcff-widget.php:85
 msgid "Privacy policy"
 msgstr "Datenschutzerklärung"
 
-#: includes/class-lcff-widget.php:84
+#: includes/class-lcff-widget.php:86
 msgid "This conversation continues by email. The link in our email brings you back here."
 msgstr "Dieses Gespräch wird per E-Mail fortgesetzt. Über den Link in unserer E-Mail kommen Sie hierher zurück."
 
-#: includes/class-lcff-widget.php:85
+#: includes/class-lcff-widget.php:87
 msgid "This conversation now continues in another browser."
 msgstr "Dieses Gespräch wird jetzt in einem anderen Browser fortgesetzt."
 
-#: includes/class-lcff-widget.php:86
+#: includes/class-lcff-widget.php:88
 msgid "Continue your conversation here?"
-msgstr "Ihr Gespräch hier fortsetzen?"
+msgstr "Möchten Sie das Gespräch hier fortsetzen?"
 
-#: includes/class-lcff-widget.php:87
+#: includes/class-lcff-widget.php:89
 msgid "Continue chat"
 msgstr "Chat fortsetzen"
 
-#: includes/class-lcff-widget.php:88
+#: includes/class-lcff-widget.php:90
 msgid "This link has expired or was already used."
 msgstr "Dieser Link ist abgelaufen oder wurde bereits verwendet."
 
-#: includes/class-lcff-widget.php:89
+#: includes/class-lcff-widget.php:91
 msgid "Online · usually replies in a few minutes"
-msgstr "Online · antwortet meist innerhalb weniger Minuten"
+msgstr "Online · Antwort meist innerhalb weniger Minuten"
 
 #. translators: Header status while the chat is closed. {time} is replaced in the browser with today's opening time in the site language, e.g. 09:00. Keep {time} as it is.
-#: includes/class-lcff-widget.php:91
+#: includes/class-lcff-widget.php:93
 msgid "Back today {time} · we'll answer by email"
 msgstr "Heute ab {time} Uhr wieder erreichbar · wir antworten Ihnen per E-Mail"
 
 #. translators: Header status while the chat is closed. {day} is replaced in the browser with the weekday name in the site language, e.g. Monday; {time} with the opening time, e.g. 09:00. Keep {day} and {time} as they are.
-#: includes/class-lcff-widget.php:93
+#: includes/class-lcff-widget.php:95
 msgid "Back {day} {time} · we'll answer by email"
 msgstr "Ab {day}, {time} Uhr wieder erreichbar · wir antworten Ihnen per E-Mail"
 
-#: includes/class-lcff-widget.php:94
+#: includes/class-lcff-widget.php:96
 msgid "Too many messages in a short time. Please wait a moment."
 msgstr "Zu viele Nachrichten in kurzer Zeit. Bitte warten Sie einen Moment."
 
-#: includes/class-lcff-widget.php:95
+#: includes/class-lcff-widget.php:97
 msgid "via email"
 msgstr "per E-Mail"

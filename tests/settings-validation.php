@@ -71,6 +71,16 @@ t( 'http [::1] on an https site', LCFF_Settings::validate_url( 'http://[::1]:809
 t( 'localhost host is case-insensitive', LCFF_Settings::validate_url( 'http://LocalHost', true ), array( 'http://LocalHost', null ) );
 t( 'localhost.example.com is not loopback', LCFF_Settings::validate_url( 'http://localhost.example.com', true ), array( '', 'https_required' ) );
 t( 'empty is fine', LCFF_Settings::validate_url( '', true ), array( '', null ) );
+// The URL becomes the API base the widget appends paths to, and it is public in the page.
+t( 'user and password are invalid', LCFF_Settings::validate_url( 'https://u:p@help.example', true ), array( '', 'invalid' ) );
+t( 'a user alone is invalid', LCFF_Settings::validate_url( 'https://u@help.example', true ), array( '', 'invalid' ) );
+t( 'a query is invalid', LCFF_Settings::validate_url( 'https://help.example/?a=1', true ), array( '', 'invalid' ) );
+t( 'a fragment is invalid', LCFF_Settings::validate_url( 'https://help.example/#x', true ), array( '', 'invalid' ) );
+t( 'an empty query is invalid', LCFF_Settings::validate_url( 'https://help.example/?', true ), array( '', 'invalid' ) );
+t( 'an empty fragment is invalid', LCFF_Settings::validate_url( 'https://help.example#', true ), array( '', 'invalid' ) );
+t( 'credentials on loopback are invalid too', LCFF_Settings::validate_url( 'http://u:p@localhost:8090', true ), array( '', 'invalid' ) );
+t( 'a path is fine', LCFF_Settings::validate_url( 'https://help.example/support/', true ), array( 'https://help.example/support', null ) );
+t( 'a port is fine', LCFF_Settings::validate_url( 'https://help.example:8443', true ), array( 'https://help.example:8443', null ) );
 
 $secret = str_repeat( 'Ab1_-', 8 ) . 'xyz';
 $site   = '0123456789abcdef0123456789abcdef';

@@ -391,7 +391,7 @@ class LCFF_Settings {
 	}
 
 	/**
-	 * Checks a FreeScout URL.
+	 * Checks a FreeScout URL: http or https with a host, and no user, password, query or fragment.
 	 *
 	 * @param mixed $raw            Submitted value.
 	 * @param bool  $site_is_https  Whether this WordPress site uses HTTPS.
@@ -402,9 +402,18 @@ class LCFF_Settings {
 		if ( '' === $raw ) {
 			return array( '', null );
 		}
-		$scheme = strtolower( (string) parse_url( $raw, PHP_URL_SCHEME ) );
-		$host   = (string) parse_url( $raw, PHP_URL_HOST );
+		$parts = parse_url( $raw );
+		if ( ! is_array( $parts ) ) {
+			return array( '', 'invalid' );
+		}
+		$scheme = strtolower( isset( $parts['scheme'] ) ? (string) $parts['scheme'] : '' );
+		$host   = isset( $parts['host'] ) ? (string) $parts['host'] : '';
 		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) || '' === $host ) {
+			return array( '', 'invalid' );
+		}
+		// The widget appends the API path to this URL, and the page shows it to every visitor:
+		// no credentials, no query, no fragment (PHP 7 drops an empty "?" or "#" from parse_url()).
+		if ( isset( $parts['user'] ) || isset( $parts['pass'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] ) || false !== strpbrk( $raw, '?#' ) ) {
 			return array( '', 'invalid' );
 		}
 		$url = untrailingslashit( esc_url_raw( $raw, array( 'http', 'https' ) ) );
