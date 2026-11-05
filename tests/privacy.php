@@ -40,6 +40,7 @@ set_error_handler( function ( $no, $msg, $file, $line ) {
 	return true;
 } );
 
+function wp_strip_all_tags( $v ) { return trim( strip_tags( (string) $v ) ); }
 require __DIR__ . '/../includes/class-lcff-appearance.php';
 require __DIR__ . '/../includes/class-lcff-settings.php';
 require __DIR__ . '/../includes/class-lcff-privacy.php';

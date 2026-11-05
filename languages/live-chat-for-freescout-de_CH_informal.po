@@ -444,3 +444,26 @@ msgstr "10 Minuten"
 #: includes/class-lcff-privacy.php:35
 msgid "Tells the chat to close the conversation in this browser after you log out of this site."
 msgstr "Sagt dem Chat, das Gespräch in diesem Browser zu beenden, nachdem du dich von dieser Website abgemeldet hast."
+
+#: includes/class-lcff-connection.php
+msgid "Your session has expired. Reload the page and try again."
+msgstr "Deine Sitzung ist abgelaufen. Lade die Seite neu und versuche es noch einmal."
+
+#: includes/class-lcff-settings.php
+msgid "The test could not run. Reload the page and try again."
+msgstr "Der Test konnte nicht ausgeführt werden. Lade die Seite neu und versuche es noch einmal."
+
+#: includes/class-lcff-settings.php
+#, php-format
+msgid "%s: open"
+msgstr "%s: geöffnet"
+
+#: includes/class-lcff-settings.php
+#, php-format
+msgid "%s: opening time"
+msgstr "%s: Öffnungszeit"
+
+#: includes/class-lcff-settings.php
+#, php-format
+msgid "%s: closing time"
+msgstr "%s: Schliesszeit"

@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Answers the widget's identity and order-number lookups over admin-ajax.php.
+ */
 class LCFF_Identity {
 
 	const COOKIE        = 'lcff_logout';
@@ -92,22 +95,13 @@ class LCFF_Identity {
 
 	/**
 	 * Compares scheme, host and port of an Origin header with home_url().
+	 *
+	 * @param string $origin The Origin header.
+	 * @return bool
 	 */
 	private static function origin_matches( $origin ) {
-		$o = wp_parse_url( $origin );
-		$h = wp_parse_url( home_url() );
-		if ( empty( $o['scheme'] ) || empty( $o['host'] ) || empty( $h['scheme'] ) || empty( $h['host'] ) ) {
-			return false;
-		}
-		$port = static function ( $u ) {
-			if ( isset( $u['port'] ) ) {
-				return (int) $u['port'];
-			}
-			return 'https' === strtolower( $u['scheme'] ) ? 443 : 80;
-		};
-		return strtolower( $o['scheme'] ) === strtolower( $h['scheme'] )
-			&& strtolower( $o['host'] ) === strtolower( $h['host'] )
-			&& $port( $o ) === $port( $h );
+		$theirs = LCFF_Settings::origin( $origin );
+		return null !== $theirs && LCFF_Settings::origin( home_url() ) === $theirs;
 	}
 
 	private static function base_payload( $type, $bind ) {
@@ -284,13 +278,17 @@ class LCFF_Identity {
 	 * @return string
 	 */
 	public static function ip_bucket( $ip ) {
-		$ip  = trim( (string) $ip );
-		$bin = @inet_pton( $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$ip    = trim( (string) $ip );
+		$plain = $ip;
+		if ( false !== strpos( $ip, ':' ) ) {
+			$plain = preg_replace( '/%.*$/', '', $ip ); // An IPv6 zone id ("%eth0") names the interface, not the client.
+		}
+		$bin = @inet_pton( $plain ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		if ( false === $bin ) {
 			return $ip;
 		}
 		if ( 4 === strlen( $bin ) ) {
-			return $ip;
+			return $plain;
 		}
 		if ( 0 === strncmp( $bin, str_repeat( "\0", 10 ) . "\xff\xff", 12 ) ) {
 			return inet_ntop( substr( $bin, 12 ) );

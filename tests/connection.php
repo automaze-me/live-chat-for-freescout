@@ -22,6 +22,8 @@ function __( $text, $domain = null ) { return $text; }
 function wp_remote_retrieve_response_code( $r ) { return isset( $r['response']['code'] ) ? $r['response']['code'] : ''; }
 function wp_remote_retrieve_body( $r ) { return isset( $r['body'] ) ? $r['body'] : ''; }
 
+function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
+require __DIR__ . '/../includes/class-lcff-settings.php';
 require __DIR__ . '/../includes/class-lcff-connection.php';
 
 $ok = true;
@@ -69,6 +71,19 @@ t( '200 unknown secret state', LCFF_Connection::interpret( resp( 200, array( 'ok
 	array( 'ok' => false, 'message' => 'FreeScout answered, but not as expected (HTTP 200). Is the Website Chat module installed and active?' ) );
 t( 'transport error', LCFF_Connection::interpret( new WP_Error( 'http_request_failed', 'cURL error 7: Failed to connect' ), $home ),
 	array( 'ok' => false, 'message' => "Couldn't reach FreeScout: cURL error 7: Failed to connect" ) );
+
+// A saved secret on a PHP without AES-256-GCM: no token was sent, so "missing" is not the admin's fault.
+t( 'saved secret, no GCM', LCFF_Connection::interpret( resp( 200, array( 'ok' => true, 'secret' => 'missing', 'origin' => null ) ), $home, true ),
+	array( 'ok' => false, 'message' => "This server's PHP can't encrypt with AES-256-GCM (OpenSSL), so logged-in visitors and order numbers can't be recognized." ) );
+t( 'no secret, no GCM flag stays the old text', LCFF_Connection::interpret( resp( 200, array( 'ok' => true, 'secret' => 'missing', 'origin' => null ) ), $home, false )['ok'], true );
+
+// LCFF_Settings::origin().
+t( 'origin drops the default https port', LCFF_Settings::origin( 'https://x:443' ), 'https://x' );
+t( 'origin keeps another port', LCFF_Settings::origin( 'http://x:8080' ), 'http://x:8080' );
+t( 'origin drops the default http port', LCFF_Settings::origin( 'http://x:80/path' ), 'http://x' );
+t( 'origin lower-cases scheme and host', LCFF_Settings::origin( 'HTTPS://X.Test' ), 'https://x.test' );
+t( 'origin of garbage is null', LCFF_Settings::origin( 'not a url' ), null );
+t( 'origin of the string null is null', LCFF_Settings::origin( 'null' ), null );
 
 echo $ok ? "PASS\n" : "FAIL\n";
 exit( $ok ? 0 : 1 );

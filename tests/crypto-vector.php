@@ -52,5 +52,12 @@ foreach ( array(
 	}
 }
 
+if ( LCFF_Crypto::available() === LCFF_Crypto::available() ) {
+	echo "ok   available() is stable\n";
+} else {
+	$ok = false;
+	echo "FAIL available() is stable\n";
+}
+
 echo $ok ? "PASS\n" : "FAIL\n";
 exit( $ok ? 0 : 1 );

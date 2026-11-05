@@ -10,6 +10,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * The settings page's "Test connection" request and its messages.
+ */
 class LCFF_Connection {
 
 	const ACTION    = 'lcff_test_connection';
@@ -18,14 +21,23 @@ class LCFF_Connection {
 	const TIMEOUT   = 10;
 	const BIND_ZERO = '0000000000000000000000000000000000000000000000000000000000000000';
 
+	/**
+	 * Registers the admin-ajax handler (logged-in users only).
+	 */
 	public static function init() {
 		add_action( 'wp_ajax_' . self::ACTION, array( __CLASS__, 'handle_ajax' ) );
 	}
 
+	/**
+	 * Runs the test for an administrator with a valid nonce; answers JSON.
+	 * A failed check is a 403 with data.message, which the admin script shows.
+	 */
 	public static function handle_ajax() {
-		check_ajax_referer( self::NONCE, 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json( array( 'ok' => false, 'message' => '' ), 403 );
+			wp_send_json_error( array( 'message' => '' ), 403 );
+		}
+		if ( ! check_ajax_referer( self::NONCE, 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => __( 'Your session has expired. Reload the page and try again.', 'live-chat-for-freescout' ) ), 403 );
 		}
 		nocache_headers();
 		wp_send_json( self::test() );
@@ -37,19 +49,8 @@ class LCFF_Connection {
 	 * @return string
 	 */
 	public static function home_origin() {
-		$u = wp_parse_url( home_url() );
-		if ( empty( $u['scheme'] ) || empty( $u['host'] ) ) {
-			return '';
-		}
-		$scheme = strtolower( $u['scheme'] );
-		$origin = $scheme . '://' . strtolower( $u['host'] );
-		if ( ! empty( $u['port'] ) ) {
-			$port = (int) $u['port'];
-			if ( ! ( ( 'http' === $scheme && 80 === $port ) || ( 'https' === $scheme && 443 === $port ) ) ) {
-				$origin .= ':' . $port;
-			}
-		}
-		return $origin;
+		$origin = LCFF_Settings::origin( home_url() );
+		return null === $origin ? '' : $origin;
 	}
 
 	/**
@@ -85,6 +86,9 @@ class LCFF_Connection {
 			}
 		}
 
+		// wp_remote_post(), not wp_safe_remote_post(): the safe variant refuses loopback and private-network
+		// hosts, which would break FreeScout on a LAN or the dev stack. The URL is admin-saved, and this
+		// request needs manage_options and a nonce.
 		$response = wp_remote_post(
 			$s['freescout_url'] . '/wordpress-chat/api/v1/sites/' . $s['site_id'] . '/ping',
 			array(
@@ -97,7 +101,8 @@ class LCFF_Connection {
 			)
 		);
 
-		return self::interpret( $response, self::home_origin() );
+		$no_gcm = LCFF_Settings::is_valid_secret( $s['secret'] ) && ! LCFF_Crypto::available();
+		return self::interpret( $response, self::home_origin(), $no_gcm );
 	}
 
 	/**
@@ -106,9 +111,10 @@ class LCFF_Connection {
 	 *
 	 * @param array|WP_Error $response    The result of wp_remote_post().
 	 * @param string         $home_origin This website's origin, for the mismatch message.
+	 * @param bool           $no_gcm      A secret is saved but this PHP can't seal tokens, so no token was sent.
 	 * @return array array( 'ok' => bool, 'message' => string ).
 	 */
-	public static function interpret( $response, $home_origin = '' ) {
+	public static function interpret( $response, $home_origin = '', $no_gcm = false ) {
 		if ( is_wp_error( $response ) ) {
 			/* translators: %s: the error from the HTTP request */
 			return self::result( false, sprintf( __( "Couldn't reach FreeScout: %s", 'live-chat-for-freescout' ), $response->get_error_message() ) );
@@ -131,6 +137,9 @@ class LCFF_Connection {
 				return self::result( true, __( 'Connected. FreeScout accepted the Site ID and the secret.', 'live-chat-for-freescout' ) );
 			}
 			if ( 'missing' === $data['secret'] ) {
+				if ( $no_gcm ) {
+					return self::result( false, __( "This server's PHP can't encrypt with AES-256-GCM (OpenSSL), so logged-in visitors and order numbers can't be recognized.", 'live-chat-for-freescout' ) );
+				}
 				return self::result( true, __( "Connected. No secret is saved, so logged-in visitors and order numbers won't be recognized.", 'live-chat-for-freescout' ) );
 			}
 		} elseif ( 404 === $code && 'not_found' === $err ) {
@@ -145,6 +154,13 @@ class LCFF_Connection {
 		return self::result( false, sprintf( __( 'FreeScout answered, but not as expected (HTTP %d). Is the Website Chat module installed and active?', 'live-chat-for-freescout' ), $code ) );
 	}
 
+	/**
+	 * Builds the answer array.
+	 *
+	 * @param bool   $ok      Success.
+	 * @param string $message Admin message.
+	 * @return array
+	 */
 	private static function result( $ok, $message ) {
 		return array(
 			'ok'      => $ok,

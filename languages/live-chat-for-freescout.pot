@@ -443,3 +443,29 @@ msgstr ""
 #: includes/class-lcff-privacy.php:35
 msgid "Tells the chat to close the conversation in this browser after you log out of this site."
 msgstr ""
+
+#: includes/class-lcff-connection.php
+msgid "Your session has expired. Reload the page and try again."
+msgstr ""
+
+#: includes/class-lcff-settings.php
+msgid "The test could not run. Reload the page and try again."
+msgstr ""
+
+#. translators: Screen-reader label of the open checkbox. %s: the day of the week
+#: includes/class-lcff-settings.php
+#, php-format
+msgid "%s: open"
+msgstr ""
+
+#. translators: Screen-reader label of the opening time. %s: the day of the week
+#: includes/class-lcff-settings.php
+#, php-format
+msgid "%s: opening time"
+msgstr ""
+
+#. translators: Screen-reader label of the closing time. %s: the day of the week
+#: includes/class-lcff-settings.php
+#, php-format
+msgid "%s: closing time"
+msgstr ""

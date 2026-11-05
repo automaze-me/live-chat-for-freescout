@@ -9,6 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Seals identity tokens with AES-256-GCM and an HKDF-derived key.
+ */
 class LCFF_Crypto {
 
 	const CONTEXT = 'lcff identity v1';
@@ -19,10 +22,15 @@ class LCFF_Crypto {
 	 * @return bool
 	 */
 	public static function available() {
-		return function_exists( 'openssl_encrypt' )
+		static $available = null; // The answer cannot change within a request.
+		if ( null !== $available ) {
+			return $available;
+		}
+		$available = function_exists( 'openssl_encrypt' )
 			&& function_exists( 'hash_hkdf' )
 			&& function_exists( 'openssl_get_cipher_methods' )
 			&& in_array( 'aes-256-gcm', array_map( 'strtolower', openssl_get_cipher_methods() ), true );
+		return $available;
 	}
 
 	/**

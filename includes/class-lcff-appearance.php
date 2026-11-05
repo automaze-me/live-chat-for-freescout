@@ -64,7 +64,7 @@ class LCFF_Appearance {
 	public static function normalize_paths( $text ) {
 		$lines = array();
 		foreach ( preg_split( '/\r\n|\r|\n/', (string) $text ) as $line ) {
-			$line = trim( strip_tags( $line ) );
+			$line = trim( wp_strip_all_tags( $line ) );
 			if ( '' === $line ) {
 				continue;
 			}
@@ -83,7 +83,7 @@ class LCFF_Appearance {
 	 */
 	public static function request_path( $request_uri, $home_path ) {
 		$uri  = preg_replace( '#^/{2,}#', '/', (string) $request_uri );
-		$path = (string) parse_url( $uri, PHP_URL_PATH );
+		$path = (string) wp_parse_url( $uri, PHP_URL_PATH );
 		if ( '' === $path ) {
 			$path = '/';
 		}

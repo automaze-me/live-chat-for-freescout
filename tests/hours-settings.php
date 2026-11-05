@@ -38,5 +38,9 @@ $f = LCFF_Settings::hours_from_form( array( array( 'open' => '1', 'from' => '09:
 t( 'form: checked kept', $f[0], array( '09:00', '17:00' ) );
 t( 'form: unchecked closed', $f[1], null );
 
+$f = LCFF_Settings::hours_from_form( array( array( 'open' => '1', 'from' => '00:00', 'to' => '00:00' ) ) );
+t( 'form: open, 00:00 to 00:00 is the full day', $f[0], array( '00:00', '24:00' ) );
+t( 'full day survives sanitize_hours', LCFF_Settings::sanitize_hours( $f )[0], array( '00:00', '24:00' ) );
+
 echo $ok ? "PASS\n" : "FAIL\n";
 exit( $ok ? 0 : 1 );

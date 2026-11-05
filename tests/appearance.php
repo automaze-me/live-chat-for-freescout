@@ -18,7 +18,9 @@ function esc_url_raw( $url, $protocols = null ) {
 	return filter_var( $url, FILTER_VALIDATE_URL ) ? $url : '';
 }
 function absint( $v ) { return abs( (int) $v ); }
+function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 
+function wp_strip_all_tags( $v ) { return trim( strip_tags( (string) $v ) ); }
 require __DIR__ . '/../includes/class-lcff-appearance.php';
 
 $ok = true;

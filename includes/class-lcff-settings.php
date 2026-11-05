@@ -9,12 +9,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Stores the plugin settings and renders the settings page.
+ */
 class LCFF_Settings {
 
 	const OPTION = 'lcff_settings';
 	const GROUP  = 'lcff_settings_group';
 	const PAGE   = 'live-chat-for-freescout';
 
+	/**
+	 * Registers the menu, the settings and the admin assets.
+	 */
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register' ) );
@@ -60,6 +66,34 @@ class LCFF_Settings {
 		return '' !== $s['freescout_url'] && self::is_valid_site_id( $s['site_id'] );
 	}
 
+	/**
+	 * Scheme, lower-case host and port of a URL, the default port dropped.
+	 *
+	 * @param string $url A URL, or an Origin header.
+	 * @return string|null e.g. "https://shop.test:8443"; null when there is no scheme and host.
+	 */
+	public static function origin( $url ) {
+		$u = wp_parse_url( (string) $url );
+		if ( ! is_array( $u ) || empty( $u['scheme'] ) || empty( $u['host'] ) ) {
+			return null;
+		}
+		$scheme = strtolower( $u['scheme'] );
+		$origin = $scheme . '://' . strtolower( $u['host'] );
+		if ( ! empty( $u['port'] ) ) {
+			$port = (int) $u['port'];
+			if ( ! ( ( 'http' === $scheme && 80 === $port ) || ( 'https' === $scheme && 443 === $port ) ) ) {
+				$origin .= ':' . $port;
+			}
+		}
+		return $origin;
+	}
+
+	/**
+	 * True for a well-formed site secret.
+	 *
+	 * @param mixed $secret Candidate.
+	 * @return bool
+	 */
 	public static function is_valid_secret( $secret ) {
 		return is_string( $secret ) && 1 === preg_match( '/^[A-Za-z0-9_-]{43}$/', $secret );
 	}
@@ -74,10 +108,19 @@ class LCFF_Settings {
 		return self::is_valid_secret( $s['secret'] ) && self::is_valid_site_id( $s['site_id'] ) && LCFF_Crypto::available();
 	}
 
+	/**
+	 * True for a well-formed site ID.
+	 *
+	 * @param mixed $site_id Candidate.
+	 * @return bool
+	 */
 	public static function is_valid_site_id( $site_id ) {
 		return is_string( $site_id ) && 1 === preg_match( '/^[a-f0-9]{32}$/', $site_id );
 	}
 
+	/**
+	 * Adds Settings > Live Chat for FreeScout.
+	 */
 	public static function add_menu() {
 		add_options_page(
 			__( 'Live Chat for FreeScout', 'live-chat-for-freescout' ),
@@ -99,6 +142,7 @@ class LCFF_Settings {
 		}
 		wp_enqueue_media();
 		wp_enqueue_style( 'wp-color-picker' );
+		wp_enqueue_style( 'lcff-admin', LCFF_PLUGIN_URL . 'assets/css/lcff-admin.css', array(), LCFF_VERSION );
 		wp_enqueue_script( 'lcff-admin', LCFF_PLUGIN_URL . 'assets/js/lcff-admin.js', array( 'wp-color-picker' ), LCFF_VERSION, true );
 		wp_localize_script(
 			'lcff-admin',
@@ -109,12 +153,14 @@ class LCFF_Settings {
 				'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
 				'testAction'   => LCFF_Connection::ACTION,
 				'testNonce'    => wp_create_nonce( LCFF_Connection::NONCE ),
-				/* translators: %s: the error from the request */
-				'unreachable'  => __( "Couldn't reach FreeScout: %s", 'live-chat-for-freescout' ),
+				'testFailed'   => __( 'The test could not run. Reload the page and try again.', 'live-chat-for-freescout' ),
 			)
 		);
 	}
 
+	/**
+	 * Registers the option, the sections and the fields.
+	 */
 	public static function register() {
 		register_setting(
 			self::GROUP,
@@ -228,13 +274,38 @@ class LCFF_Settings {
 			$base  = self::OPTION . '[hours][' . $i . ']';
 			$id    = 'lcff_hours_' . $i;
 			$to    = $range ? ( '24:00' === $range[1] ? '00:00' : $range[1] ) : '17:00';
-			echo '<p style="margin:0 0 6px;">';
+			echo '<p class="lcff-hours-row">';
 			/* translators: Checkbox after a weekday in the working hours: the chat is open on that day. */
-			printf( '<strong style="display:inline-block;min-width:6em;">%1$s</strong> <label for="%2$s_open" style="display:inline-block;min-width:6em;"><input type="checkbox" id="%2$s_open" name="%3$s[open]" value="1"%4$s /> %5$s</label> ', esc_html( $label ), esc_attr( $id ), esc_attr( $base ), checked( null !== $range, true, false ), esc_html__( 'Open', 'live-chat-for-freescout' ) );
-			/* translators: Label before the opening time of a day ("from 09:00"). */
-			printf( '<label for="%1$s_from">%2$s</label> <input type="time" id="%1$s_from" name="%3$s[from]" value="%4$s" /> ', esc_attr( $id ), esc_html__( 'from', 'live-chat-for-freescout' ), esc_attr( $base ), esc_attr( $range ? $range[0] : '09:00' ) );
-			/* translators: Label before the closing time of a day ("to 17:00"). */
-			printf( '<label for="%1$s_to">%2$s</label> <input type="time" id="%1$s_to" name="%3$s[to]" value="%4$s" />', esc_attr( $id ), esc_html__( 'to', 'live-chat-for-freescout' ), esc_attr( $base ), esc_attr( $to ) );
+			printf(
+				'<strong class="lcff-hours-day">%1$s</strong> <label class="lcff-hours-open" for="%2$s_open"><input type="checkbox" id="%2$s_open" name="%3$s[open]" value="1"%4$s /> <span class="screen-reader-text">%5$s</span><span aria-hidden="true">%6$s</span></label> ',
+				esc_html( $label ),
+				esc_attr( $id ),
+				esc_attr( $base ),
+				checked( null !== $range, true, false ),
+				/* translators: Screen-reader label of the open checkbox. %s: the day of the week */
+				esc_html( sprintf( __( '%s: open', 'live-chat-for-freescout' ), $label ) ),
+				esc_html__( 'Open', 'live-chat-for-freescout' )
+			);
+			printf(
+				'<label for="%1$s_from"><span class="screen-reader-text">%2$s</span><span aria-hidden="true">%3$s</span></label> <input type="time" id="%1$s_from" name="%4$s[from]" value="%5$s" /> ',
+				esc_attr( $id ),
+				/* translators: Screen-reader label of the opening time. %s: the day of the week */
+				esc_html( sprintf( __( '%s: opening time', 'live-chat-for-freescout' ), $label ) ),
+				/* translators: Label before the opening time of a day ("from 09:00"). */
+				esc_html__( 'from', 'live-chat-for-freescout' ),
+				esc_attr( $base ),
+				esc_attr( $range ? $range[0] : '09:00' )
+			);
+			printf(
+				'<label for="%1$s_to"><span class="screen-reader-text">%2$s</span><span aria-hidden="true">%3$s</span></label> <input type="time" id="%1$s_to" name="%4$s[to]" value="%5$s" />',
+				esc_attr( $id ),
+				/* translators: Screen-reader label of the closing time. %s: the day of the week */
+				esc_html( sprintf( __( '%s: closing time', 'live-chat-for-freescout' ), $label ) ),
+				/* translators: Label before the closing time of a day ("to 17:00"). */
+				esc_html__( 'to', 'live-chat-for-freescout' ),
+				esc_attr( $base ),
+				esc_attr( $to )
+			);
 			echo '</p>';
 		}
 		$tz = function_exists( 'wp_timezone_string' ) ? wp_timezone_string() : '';
@@ -259,12 +330,12 @@ class LCFF_Settings {
 				$url = $val ? wp_get_attachment_image_url( (int) $val, 'thumbnail' ) : '';
 				printf( '<input type="hidden" id="%1$s" name="%2$s" value="%3$s" />', esc_attr( $id ), esc_attr( $name ), esc_attr( (int) $val ) );
 				printf(
-					'<p><img id="lcff_avatar_preview" src="%1$s" alt="" style="width:64px;height:64px;border-radius:50%%;object-fit:cover;%2$s" /></p>',
-					esc_url( (string) $url ),
-					$url ? '' : 'display:none;'
+					'<p><img id="lcff_avatar_preview" class="lcff-avatar-preview%1$s" src="%2$s" alt="" /></p>',
+					$url ? '' : ' lcff-hidden',
+					esc_url( (string) $url )
 				);
 				echo '<button type="button" class="button" id="lcff_avatar_choose">' . esc_html__( 'Choose an avatar', 'live-chat-for-freescout' ) . '</button> ';
-				echo '<button type="button" class="button-link" id="lcff_avatar_remove"' . ( $url ? '' : ' style="display:none;"' ) . '>' . esc_html__( 'Remove', 'live-chat-for-freescout' ) . '</button>';
+				echo '<button type="button" class="button-link' . ( $url ? '' : ' lcff-hidden' ) . '" id="lcff_avatar_remove">' . esc_html__( 'Remove', 'live-chat-for-freescout' ) . '</button>';
 				break;
 			case 'accent':
 				printf(
@@ -320,14 +391,16 @@ class LCFF_Settings {
 		$input = is_array( $input ) ? $input : array();
 		$out   = self::get();
 
-		$raw_url              = self::text( $input, 'freescout_url' );
-		list( $url, $url_err ) = self::validate_url( $raw_url, self::site_is_https() );
-		if ( 'https_required' === $url_err ) {
-			add_settings_error( self::OPTION, 'lcff_url_https', __( 'Your site uses HTTPS, so the FreeScout URL must start with https://.', 'live-chat-for-freescout' ) );
-		} elseif ( null !== $url_err ) {
-			add_settings_error( self::OPTION, 'lcff_url', __( 'The FreeScout URL is not valid.', 'live-chat-for-freescout' ) );
-		} else {
-			$out['freescout_url'] = $url;
+		// A posted array is not a URL: keep the stored one, without an error.
+		if ( ! isset( $input['freescout_url'] ) || is_string( $input['freescout_url'] ) ) {
+			list( $url, $url_err ) = self::validate_url( self::text( $input, 'freescout_url' ), self::site_is_https() );
+			if ( 'https_required' === $url_err ) {
+				add_settings_error( self::OPTION, 'lcff_url_https', __( 'Your site uses HTTPS, so the FreeScout URL must start with https://.', 'live-chat-for-freescout' ) );
+			} elseif ( null !== $url_err ) {
+				add_settings_error( self::OPTION, 'lcff_url', __( 'The FreeScout URL is not valid.', 'live-chat-for-freescout' ) );
+			} else {
+				$out['freescout_url'] = $url;
+			}
 		}
 
 		$site_id = strtolower( trim( sanitize_text_field( self::text( $input, 'site_id' ) ) ) );
@@ -402,7 +475,7 @@ class LCFF_Settings {
 		if ( '' === $raw ) {
 			return array( '', null );
 		}
-		$parts = parse_url( $raw );
+		$parts = wp_parse_url( $raw );
 		if ( ! is_array( $parts ) ) {
 			return array( '', 'invalid' );
 		}
@@ -412,7 +485,7 @@ class LCFF_Settings {
 			return array( '', 'invalid' );
 		}
 		// The widget appends the API path to this URL, and the page shows it to every visitor:
-		// no credentials, no query, no fragment (PHP 7 drops an empty "?" or "#" from parse_url()).
+		// no credentials, no query, no fragment (PHP 7 drops an empty "?" or "#" from the parsed URL).
 		if ( isset( $parts['user'] ) || isset( $parts['pass'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] ) || false !== strpbrk( $raw, '?#' ) ) {
 			return array( '', 'invalid' );
 		}
@@ -462,7 +535,7 @@ class LCFF_Settings {
 			} elseif ( is_array( $row ) && ! empty( $row['open'] ) ) {
 				$from = ( isset( $row['from'] ) && is_string( $row['from'] ) ) ? $row['from'] : '';
 				$to   = ( isset( $row['to'] ) && is_string( $row['to'] ) ) ? $row['to'] : '';
-				if ( '00:00' === $to && '' !== $from && '00:00' !== $from ) {
+				if ( '00:00' === $to && '' !== $from ) {
 					$to = '24:00'; // A time input can't show 24:00: an end of midnight means the end of the day.
 				}
 				$list[] = array( $from, $to );
@@ -501,6 +574,12 @@ class LCFF_Settings {
 		return $out;
 	}
 
+	/**
+	 * Renders one connection field (URL, Site ID, secret). The saved secret
+	 * is never printed back into the form.
+	 *
+	 * @param array $args Field args: key, type, placeholder, description.
+	 */
 	public static function render_field( $args ) {
 		$s        = self::get();
 		$key      = $args['key'];
@@ -520,7 +599,7 @@ class LCFF_Settings {
 			esc_attr( $args['placeholder'] )
 		);
 		if ( $invalid ) {
-			echo '<p class="description" style="color:#b32d2e;">' . esc_html__( 'The saved secret is not valid. Paste it again from FreeScout.', 'live-chat-for-freescout' ) . '</p>';
+			echo '<p class="description lcff-error">' . esc_html__( 'The saved secret is not valid. Paste it again from FreeScout.', 'live-chat-for-freescout' ) . '</p>';
 		}
 		if ( ! empty( $args['description'] ) ) {
 			echo '<p class="description">' . esc_html( $args['description'] ) . '</p>';
@@ -530,11 +609,14 @@ class LCFF_Settings {
 				printf( '<p><label for="lcff_secret_clear"><input type="checkbox" id="lcff_secret_clear" name="%1$s[secret_clear]" value="1" /> %2$s</label></p>', esc_attr( self::OPTION ), esc_html__( 'Remove the saved secret', 'live-chat-for-freescout' ) );
 			}
 			if ( ! LCFF_Crypto::available() ) {
-				echo '<p class="description" style="color:#b32d2e;">' . esc_html__( "This server's PHP can't encrypt with AES-256-GCM (OpenSSL), so logged-in visitors and order numbers can't be recognized.", 'live-chat-for-freescout' ) . '</p>';
+				echo '<p class="description lcff-error">' . esc_html__( "This server's PHP can't encrypt with AES-256-GCM (OpenSSL), so logged-in visitors and order numbers can't be recognized.", 'live-chat-for-freescout' ) . '</p>';
 			}
 		}
 	}
 
+	/**
+	 * Renders the settings page.
+	 */
 	public static function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;

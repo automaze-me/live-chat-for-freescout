@@ -27,6 +27,7 @@ function esc_url_raw( $url, $protocols = null ) {
 }
 function untrailingslashit( $v ) { return rtrim( $v, '/\\' ); }
 function absint( $v ) { return abs( (int) $v ); }
+function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 function __( $text, $domain = null ) { return $text; }
 function wp_attachment_stub() {}
 function wp_get_attachment_image_url() { return ''; }
@@ -37,6 +38,7 @@ $GLOBALS['lcff_https'] = true;
 function is_ssl() { return $GLOBALS['lcff_https']; }
 function home_url() { return $GLOBALS['lcff_https'] ? 'https://shop.example.test' : 'http://shop.example.test'; }
 
+function wp_strip_all_tags( $v ) { return trim( strip_tags( (string) $v ) ); }
 require __DIR__ . '/../includes/class-lcff-appearance.php';
 require __DIR__ . '/../includes/class-lcff-settings.php';
 
@@ -108,6 +110,10 @@ t( 'array welcome is empty', $out['welcome'], '' );
 t( 'array privacy url is empty', $out['privacy_url'], '' );
 t( 'array site id is empty', $out['site_id'], '' );
 $GLOBALS['lcff_test_errors'] = array();
+$GLOBALS['lcff_test_option'] = $saved;
+$out = LCFF_Settings::sanitize( array( 'freescout_url' => array( 'x' ) ) );
+t( 'an array for the URL keeps the stored URL', $out['freescout_url'], 'https://old.example' );
+t( 'an array for the URL raises no error', $GLOBALS['lcff_test_errors'], array() );
 
 // Clear the secret.
 $out = LCFF_Settings::sanitize( array( 'secret' => '', 'secret_clear' => '1' ) );

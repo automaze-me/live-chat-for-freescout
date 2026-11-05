@@ -37,7 +37,8 @@ require_once LCFF_PLUGIN_DIR . 'includes/class-lcff-privacy.php';
  * warns when a plugin loads its translations earlier.
  */
 function lcff_load_textdomain() {
-	load_plugin_textdomain( 'live-chat-for-freescout', false, dirname( plugin_basename( LCFF_PLUGIN_FILE ) ) . '/languages' );
+	// Bundled German files stay until translate.wordpress.org ships language packs; WordPress's just-in-time loader reads only wp-content/languages/plugins, so without this call they never load.
+	load_plugin_textdomain( 'live-chat-for-freescout', false, dirname( plugin_basename( LCFF_PLUGIN_FILE ) ) . '/languages' ); // phpcs:ignore PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound -- see the comment above.
 }
 add_action( 'init', 'lcff_load_textdomain' );
 

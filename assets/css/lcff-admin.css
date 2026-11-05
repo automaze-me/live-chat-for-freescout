@@ -1,0 +1,39 @@
+/* Live Chat for FreeScout - settings page. */
+.lcff-hours-row {
+	margin: 0 0 6px;
+}
+
+.lcff-hours-day {
+	display: inline-block;
+	min-width: 6em;
+}
+
+.lcff-hours-open {
+	display: inline-block;
+	min-width: 6em;
+}
+
+.lcff-avatar-preview {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+.lcff-hidden {
+	display: none;
+}
+
+.description.lcff-error {
+	color: #b32d2e;
+}
+
+#lcff_test_result.lcff-test-ok {
+	color: #00a32a;
+	font-weight: 600;
+}
+
+#lcff_test_result.lcff-test-error {
+	color: #d63638;
+	font-weight: 600;
+}
