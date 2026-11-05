@@ -62,6 +62,8 @@
 	/*
 	 * Ruling P5 on the logout signal: FreeScout's session forgets the
 	 * account, this browser forgets the session, and the signal is removed.
+	 * It runs before the panel is loaded, so it clears the same storage keys
+	 * as the panel's dropSession() itself.
 	 */
 	function forgetAfterLogout() {
 		var t = storedToken();
@@ -80,6 +82,9 @@
 				window.localStorage.removeItem(keys[k]);
 			} catch (e2) {}
 		}
+		try {
+			window.sessionStorage.removeItem('lcff_page');
+		} catch (e3) {}
 		expireLogoutSignal();
 	}
 

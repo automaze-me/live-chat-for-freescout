@@ -94,6 +94,10 @@ class LCFF_Widget {
 				/* translators: Header status while the chat is closed. {day} is replaced in the browser with the weekday name in the site language, e.g. Monday; {time} with the opening time, e.g. 09:00. Keep {day} and {time} as they are. */
 				'backDay'         => __( "Back {day} {time} · we'll answer by email", 'live-chat-for-freescout' ),
 				'rateLimited'     => __( 'Too many messages in a short time. Please wait a moment.', 'live-chat-for-freescout' ),
+				/* translators: Shown when the wait is longer than 90 seconds. {min} is replaced in the browser with the number of minutes to wait, e.g. 60 (always 2 or more). Keep {min} as it is. */
+				'rateLimitedMin'  => __( 'Too many messages in a short time. Please try again in {min} minutes.', 'live-chat-for-freescout' ),
+				/* translators: Added after the reason why a chat message wasn't sent (e.g. too many messages); the visitor taps the message to send it again. */
+				'retryHint'       => __( 'Tap to resend.', 'live-chat-for-freescout' ),
 				'viaEmail'        => __( 'via email', 'live-chat-for-freescout' ),
 			),
 			)

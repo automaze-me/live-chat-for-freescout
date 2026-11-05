@@ -396,7 +396,17 @@ msgstr "Ab {day}, {time} Uhr wieder erreichbar · wir antworten dir per E-Mail"
 msgid "Too many messages in a short time. Please wait a moment."
 msgstr "Zu viele Nachrichten in kurzer Zeit. Bitte warte einen Moment."
 
-#: includes/class-lcff-widget.php:97
+#. translators: Shown when the wait is longer than 90 seconds. {min} is replaced in the browser with the number of minutes to wait, e.g. 60 (always 2 or more). Keep {min} as it is.
+#: includes/class-lcff-widget.php:98
+msgid "Too many messages in a short time. Please try again in {min} minutes."
+msgstr "Zu viele Nachrichten in kurzer Zeit. Bitte versuche es in {min} Minuten noch einmal."
+
+#. translators: Added after the reason why a chat message wasn't sent (e.g. too many messages); the visitor taps the message to send it again.
+#: includes/class-lcff-widget.php:100
+msgid "Tap to resend."
+msgstr "Zum erneuten Senden antippen."
+
+#: includes/class-lcff-widget.php:101
 msgid "via email"
 msgstr "per E-Mail"
 

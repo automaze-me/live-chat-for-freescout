@@ -38,6 +38,13 @@
 	font: inherit;
 }
 
+/* A theme's ::placeholder rule (not reached by the reset above). */
+#lcff-root ::placeholder {
+	text-transform: none;
+	letter-spacing: normal;
+	opacity: 1;
+}
+
 #lcff-root .lcff-bubble,
 #lcff-root .lcff-panel {
 	--lcff-accent: #2f6f5e;
@@ -447,6 +454,15 @@
 	height: 20px;
 }
 
+/* The paperclip's own presentation attributes (clipIcon()), restated against a theme's `svg path` rule. */
+#lcff-root .lcff-attach svg path {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
 #lcff-root .lcff-attach:disabled {
 	opacity: 0.5;
 	cursor: default;
@@ -495,8 +511,10 @@
 	opacity: 0.6;
 }
 
+/* A download that failed: still a link (not struck out), in the error colour; a tap tries again. */
 #lcff-root .lcff-att--failed {
-	text-decoration: line-through;
+	color: #d63638;
+	text-decoration: underline;
 }
 
 #lcff-root .lcff-att-pending {
