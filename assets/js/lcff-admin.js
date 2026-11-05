@@ -36,6 +36,35 @@
 			frame.open();
 		});
 
+		var testButton = $('#lcff_test_connection');
+		var testResult = $('#lcff_test_result');
+
+		function showTest(ok, message) {
+			testResult
+				.text(message)
+				.css({ color: ok ? '#00a32a' : '#d63638', fontWeight: '600' });
+		}
+
+		testButton.on('click', function (e) {
+			e.preventDefault();
+			testButton.prop('disabled', true);
+			testResult.text('').css({ color: '', fontWeight: '' });
+			$.ajax({
+				url: i18n.ajaxUrl,
+				method: 'POST',
+				dataType: 'json',
+				timeout: 30000,
+				data: { action: i18n.testAction, nonce: i18n.testNonce }
+			}).done(function (res) {
+				showTest(!!(res && res.ok), (res && res.message) || '');
+			}).fail(function (xhr, status) {
+				var reason = xhr && xhr.status ? 'HTTP ' + xhr.status : status;
+				showTest(false, (i18n.unreachable || '%s').replace('%s', reason));
+			}).always(function () {
+				testButton.prop('disabled', false);
+			});
+		});
+
 		remove.on('click', function (e) {
 			e.preventDefault();
 			input.val('0');

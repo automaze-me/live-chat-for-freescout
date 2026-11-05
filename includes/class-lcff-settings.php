@@ -106,6 +106,11 @@ class LCFF_Settings {
 			array(
 				'chooseTitle'  => __( 'Choose an avatar', 'live-chat-for-freescout' ),
 				'chooseButton' => __( 'Use this image', 'live-chat-for-freescout' ),
+				'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+				'testAction'   => LCFF_Connection::ACTION,
+				'testNonce'    => wp_create_nonce( LCFF_Connection::NONCE ),
+				/* translators: %s: the error from the request */
+				'unreachable'  => __( "Couldn't reach FreeScout: %s", 'live-chat-for-freescout' ),
 			)
 		);
 	}
@@ -440,6 +445,10 @@ class LCFF_Settings {
 				submit_button();
 				?>
 			</form>
+			<p>
+				<button type="button" class="button" id="lcff_test_connection"><?php echo esc_html__( 'Test connection', 'live-chat-for-freescout' ); ?></button>
+			</p>
+			<p id="lcff_test_result" aria-live="polite"></p>
 		</div>
 		<?php
 	}
