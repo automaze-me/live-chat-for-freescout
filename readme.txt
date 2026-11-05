@@ -84,14 +84,16 @@ When a visitor uses the chat, their browser talks directly to the FreeScout addr
 
 * The messages the visitor writes and the files they attach.
 * An email address or order number, if the visitor enters one in the chat.
-* The path of the page the visitor is viewing, while a conversation is open, so your team sees where the visitor is.
+* The path of the page the visitor is viewing (without query string or fragment), while a conversation is open, so your team sees where the visitor is.
 * A random chat token that identifies the conversation in the browser.
 
-The chat shows the bubble without contacting FreeScout until the visitor opens it. A conversation is created only when the visitor sends a message.
+Showing the bubble sends nothing to FreeScout, and a conversation is created only when the visitor sends a message. Once a visitor has a conversation, the browser also talks to FreeScout to fetch replies, mark replies as read, download attachments, continue the chat from an email link and recognize a logged-in account. After a WordPress logout, the chat tells FreeScout to close that browser's chat, even before the panel is opened.
+
+Like any web server, your FreeScout server receives the visitor's IP address and browser user agent with each of these requests.
 
 **Calls from your WordPress server to your FreeScout server**
 
-* The "Test connection" button in the settings sends your Site ID, your website's address and, if a secret is saved, a short-lived signed check to FreeScout. It runs only when an administrator clicks it. The plugin makes no other request from your server to FreeScout.
+* The "Test connection" button in the settings sends your Site ID and, once a secret is saved, a short-lived signed check that includes your website's address to FreeScout. It runs only when an administrator clicks it. The plugin makes no other request from your server to FreeScout.
 
 **Logged-in visitors and orders**
 

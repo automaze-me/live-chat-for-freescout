@@ -402,7 +402,7 @@ msgstr ""
 
 #. translators: %s: the host name of the FreeScout help desk, e.g. help.example.com.
 #: includes/class-lcff-privacy.php:43
-msgid "When you use the chat on this site, your messages and the files you attach go to our help desk at %s. So does an email address or order number you enter in the chat; with an order number, the help desk also receives the order's email address and name. While a conversation is open, the chat sends the address of the page you are viewing. If you are logged in, the chat tells the help desk your account's user ID, name and email address."
+msgid "When you use the chat on this site, your messages and the files you attach go to our help desk at %s. So does an email address or order number you enter in the chat; with an order number, the help desk also receives the order's email address and name. While a conversation is open, the chat sends the path of the page you are viewing. If you are logged in, the chat tells the help desk your account's user ID, name and email address."
 msgstr ""
 
 #: includes/class-lcff-privacy.php:46
