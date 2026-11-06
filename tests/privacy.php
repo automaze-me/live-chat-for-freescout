@@ -49,8 +49,9 @@ require __DIR__ . '/../includes/class-lcff-privacy.php';
 /* ---- init ---- */
 
 LCFF_Privacy::init();
-t( 'register_consent runs on init, after the text domain loads', $GLOBALS['lcff_priorities']['init'][ serialize( array( 'LCFF_Privacy', 'register_consent' ) ) ] ?? null, 11 );
-t( 'register_consent is no longer on plugins_loaded', isset( $GLOBALS['lcff_actions']['plugins_loaded'] ), false );
+t( 'register_consent (the filter) stays on plugins_loaded', $GLOBALS['lcff_actions']['plugins_loaded'] ?? null, array( array( 'LCFF_Privacy', 'register_consent' ) ) );
+t( 'register_cookie_info runs on init at 11, after the text domain loads', $GLOBALS['lcff_priorities']['init'][ serialize( array( 'LCFF_Privacy', 'register_cookie_info' ) ) ] ?? null, 11 );
+t( 'nothing but the filter is on plugins_loaded', count( $GLOBALS['lcff_actions']['plugins_loaded'] ), 1 );
 t( 'add_policy runs on admin_init', isset( $GLOBALS['lcff_actions']['admin_init'] ) && in_array( array( 'LCFF_Privacy', 'add_policy' ), $GLOBALS['lcff_actions']['admin_init'], true ), true );
 
 /* ---- consent registration ---- */
@@ -73,6 +74,8 @@ if ( true ) {
 	}
 }
 LCFF_Privacy::register_consent();
+t( 'register_consent registers no cookie info', $GLOBALS['lcff_cookies'], array() );
+LCFF_Privacy::register_cookie_info();
 t(
 	'lcff_logout registered as functional, with expiry and purpose',
 	$GLOBALS['lcff_cookies'],
@@ -81,11 +84,11 @@ t(
 $GLOBALS['lcff_cookie_throws'] = true;
 $threw = false;
 try {
-	LCFF_Privacy::register_consent();
+	LCFF_Privacy::register_cookie_info();
 } catch ( Throwable $e ) {
 	$threw = true;
 }
-t( 'register_consent survives a failing wp_add_cookie_info()', $threw, false );
+t( 'register_cookie_info survives a failing wp_add_cookie_info()', $threw, false );
 $GLOBALS['lcff_cookie_throws'] = false;
 
 /* ---- policy text ---- */

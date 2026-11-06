@@ -14,17 +14,24 @@ class LCFF_Privacy {
 	const SERVICE = 'Live Chat for FreeScout';
 
 	public static function init() {
+		add_action( 'plugins_loaded', array( __CLASS__, 'register_consent' ) );
 		// After lcff_load_textdomain (init, 10), so the cookie description is translated.
-		add_action( 'init', array( __CLASS__, 'register_consent' ), 11 );
+		add_action( 'init', array( __CLASS__, 'register_cookie_info' ), 11 );
 		add_action( 'admin_init', array( __CLASS__, 'add_policy' ) );
 	}
 
 	/**
-	 * Tells the WP Consent API that this plugin handles consent itself and
-	 * describes its one cookie. Does nothing without the API.
+	 * Tells the WP Consent API that this plugin handles consent itself.
 	 */
 	public static function register_consent() {
 		add_filter( 'wp_consent_api_registered_' . plugin_basename( LCFF_PLUGIN_FILE ), '__return_true' );
+	}
+
+	/**
+	 * Describes the plugin's one cookie to the WP Consent API. Does nothing
+	 * without the API.
+	 */
+	public static function register_cookie_info() {
 		if ( function_exists( 'wp_add_cookie_info' ) ) {
 			// A third-party signature change must never take the site down.
 			try {
