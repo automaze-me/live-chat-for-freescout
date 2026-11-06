@@ -207,6 +207,12 @@
 			: Promise.resolve();
 		loading = hours.then(function () {
 			return loadScript(cfg.panelUrl);
+		}).then(function () {
+			/* A script that loads without defining the panel (an optimiser that
+			 * wraps or defers it) is a failed load too. */
+			if (!window.LCFF) {
+				throw new Error('lcff panel script loaded but did not start');
+			}
 		}).then(null, function (err) {
 			loading = null;
 			throw err;
@@ -292,7 +298,9 @@
 			if (window.LCFF) {
 				window.LCFF.resume();
 			}
-		}, function () {});
+		}, function () {
+			setLoadError(true);
+		});
 	}
 
 	if (startLink) {

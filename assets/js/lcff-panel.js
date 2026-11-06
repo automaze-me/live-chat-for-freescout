@@ -248,19 +248,20 @@
 	/*
 	 * fetch(), aborted after `ms` where AbortController exists. The time
 	 * covers reading the body too, so it resolves to a stand-in for the
-	 * Response, { status, ok, text(), blob() }, whose body reads stop the
+	 * Response, { status, ok, text(), blob(), cancel() }, whose body reads stop the
 	 * clock. A body nobody reads is cut off when the time is up. Rejects on
 	 * a network error or the abort. With `ctl`, ctl.abort() aborts it
 	 * early (where AbortController exists).
 	 */
 	function fetchWithTimeout(url, init, ms, ctl) {
 		var timer = null;
+		var ctrl = null;
 		var stop = function () {
 			if (timer) { clearTimeout(timer); timer = null; }
 		};
 		try {
 			if (typeof window.AbortController === 'function') {
-				var ctrl = new window.AbortController();
+				ctrl = new window.AbortController();
 				init.signal = ctrl.signal;
 				timer = setTimeout(function () { ctrl.abort(); }, ms);
 				if (ctl) { ctl.abort = function () { ctrl.abort(); }; }
@@ -274,7 +275,12 @@
 				status: res.status,
 				ok: res.ok,
 				text: function () { return read(res.text()); },
-				blob: function () { return read(res.blob()); }
+				blob: function () { return read(res.blob()); },
+				/* An answer nobody will read: stop the clock and drop the body. */
+				cancel: function () {
+					stop();
+					try { if (ctrl) { ctrl.abort(); } } catch (e) {}
+				}
 			};
 		}, function (err) {
 			stop();
@@ -319,6 +325,13 @@
 		var n = document.createElement(tag);
 		if (cls) { n.className = cls; }
 		if (text !== undefined) { n.textContent = text; }
+		return n;
+	}
+
+	/* Visitor and agent text: the browser picks the direction (Arabic, Hebrew) per message. */
+	function mkText(text) {
+		var n = mk('div', 'lcff-text', text);
+		n.setAttribute('dir', 'auto');
 		return n;
 	}
 
@@ -434,6 +447,7 @@
 
 		el.form = mk('form', 'lcff-form');
 		el.input = mk('textarea', 'lcff-input');
+		el.input.setAttribute('dir', 'auto');
 		el.input.rows = 1;
 		el.input.maxLength = 5000;
 		el.input.placeholder = str('placeholder');
@@ -557,7 +571,7 @@
 		}
 		var atts = m.attachments && m.attachments.length ? m.attachments : [];
 		if (String(m.text) !== '' || !atts.length) {
-			n.appendChild(mk('div', 'lcff-text', String(m.text)));
+			n.appendChild(mkText(String(m.text)));
 		}
 		renderAttachments(n, atts);
 		if (m.via === 'email') {
@@ -628,6 +642,8 @@
 				var bad = new Error('lcff: attachment ' + res.status);
 				bad.status = res.status;
 				bad.token = t || null;
+				/* Read nothing, but let the body go and stop the clock. */
+				try { if (res.cancel) { res.cancel(); } } catch (e) {}
 				throw bad;
 			}
 			return res.blob();
@@ -775,7 +791,7 @@
 		var n = mk('div', 'lcff-message lcff-message--visitor lcff-message--sending');
 		n.setAttribute('data-role', 'visitor');
 		n.setAttribute('data-client-id', clientId);
-		if (text) { n.appendChild(mk('div', 'lcff-text', text)); }
+		if (text) { n.appendChild(mkText(text)); }
 		if (file) { n.appendChild(mk('div', 'lcff-att-pending', String(file.name || ''))); }
 		el.list.appendChild(n);
 		keepNoticeLast();
@@ -1879,6 +1895,7 @@
 		card.appendChild(label);
 		var input = mk('input', 'lcff-ask-input');
 		input.id = id;
+		input.setAttribute('dir', 'auto');
 		input.type = canOrder ? 'text' : 'email';
 		input.maxLength = 254;
 		input.autocomplete = canOrder ? 'off' : 'email';

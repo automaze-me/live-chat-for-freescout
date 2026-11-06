@@ -26,6 +26,18 @@
 	all: revert;
 }
 
+/* Generated content a theme adds to divs, buttons and the like (`button::after`) stays out. */
+#lcff-root :where(div, span, form, label, button, input, textarea, a, img, svg)::before,
+#lcff-root :where(div, span, form, label, button, input, textarea, a, img, svg)::after {
+	all: revert;
+}
+
+/* A theme's `::selection` colour stays out. */
+#lcff-root ::selection {
+	color: HighlightText;
+	background-color: Highlight;
+}
+
 /* `hidden` hides, whatever display a rule below gives the element. */
 #lcff-root [hidden] {
 	display: none !important;
@@ -42,6 +54,7 @@
 #lcff-root ::placeholder {
 	text-transform: none;
 	letter-spacing: normal;
+	color: #50575e;
 	opacity: 1;
 }
 
