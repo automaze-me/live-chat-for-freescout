@@ -30,6 +30,7 @@ function load_plugin_textdomain( $domain, $deprecated = false, $rel_path = false
 }
 function __( $text, $domain = null ) { return $text; }
 function is_admin() { return false; }
+function is_multisite() { return false; }
 function get_option( $name, $default = false ) {
 	return array(
 		'freescout_url' => 'https://help.example.test',

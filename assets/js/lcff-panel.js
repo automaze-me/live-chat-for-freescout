@@ -6,7 +6,7 @@
 	/* The widget's storage keys, { local: [...], session: [...] }: defined
 	 * once, by the loader, which runs first and loads this script. */
 	var KEYS = window.LCFF_STORAGE;
-	if (!cfg || window.LCFF || !KEYS || !KEYS.local || !KEYS.session) {
+	if (!cfg || window.LCFF || !KEYS || !KEYS.local || !KEYS.session || typeof KEYS.name !== 'function') {
 		return;
 	}
 	var strings = cfg.strings || {};
@@ -78,7 +78,7 @@
 	function store(key, val) {
 		if (val === undefined) {
 			try {
-				var v = window.localStorage.getItem(key);
+				var v = window.localStorage.getItem(KEYS.name(key));
 				if (v !== null || !memOnly[key]) { return v; }
 			} catch (e) {}
 			return mem[key] || null;
@@ -86,12 +86,12 @@
 		if (val === null) {
 			delete mem[key];
 			delete memOnly[key];
-			try { window.localStorage.removeItem(key); } catch (e2) {}
+			try { window.localStorage.removeItem(KEYS.name(key)); } catch (e2) {}
 			return null;
 		}
 		mem[key] = val;
 		try {
-			window.localStorage.setItem(key, val);
+			window.localStorage.setItem(KEYS.name(key), val);
 			delete memOnly[key];
 		} catch (e3) {
 			memOnly[key] = true;
@@ -221,16 +221,16 @@
 	 * names that page; a new tab learns it from its first answer.
 	 */
 	var serverTakesPage = false;
-	try { serverTakesPage = window.sessionStorage.getItem('lcff_page') === '1'; } catch (e) {}
+	try { serverTakesPage = window.sessionStorage.getItem(KEYS.name('lcff_page')) === '1'; } catch (e) {}
 
 	function setPageFlag(on) {
 		if (on === serverTakesPage) { return; }
 		serverTakesPage = on;
 		try {
 			if (on) {
-				window.sessionStorage.setItem('lcff_page', '1');
+				window.sessionStorage.setItem(KEYS.name('lcff_page'), '1');
 			} else {
-				window.sessionStorage.removeItem('lcff_page');
+				window.sessionStorage.removeItem(KEYS.name('lcff_page'));
 			}
 		} catch (e) {}
 	}
@@ -1479,7 +1479,7 @@
 	function dropSession() {
 		clearStored([]);
 		for (var i = 0; i < KEYS.session.length; i++) {
-			try { window.sessionStorage.removeItem(KEYS.session[i]); } catch (e) {}
+			try { window.sessionStorage.removeItem(KEYS.name(KEYS.session[i])); } catch (e) {}
 		}
 		serverTakesPage = false;
 		pendingToken = null;
@@ -1577,7 +1577,7 @@
 		try { local = window.localStorage; } catch (x) { return; }
 		if (!e || e.storageArea !== local || e.newValue !== null) { return; }
 		// The token removed, or all of storage cleared (key null).
-		var removed = e.key === null || (e.key === 'lcff_token' && e.oldValue !== null);
+		var removed = e.key === null || (e.key === KEYS.name('lcff_token') && e.oldValue !== null);
 		if (!removed) { return; }
 		forget();
 		if (isOpen) { checkIdentity(); }

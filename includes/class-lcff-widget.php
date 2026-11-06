@@ -62,6 +62,8 @@ class LCFF_Widget {
 			'identity'   => $identity,
 			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 			'woo'        => $identity && function_exists( 'wc_get_order' ),
+			// Sites of a subdirectory network share an origin, so a sub-site adds its ID to the storage key names; the main site and a single site keep the plain names.
+			'storageSuffix' => is_multisite() && ! is_main_site() ? '_' . get_current_blog_id() : '',
 			// Day and time names in the header follow the WordPress locale, not <html lang>. They match the language of these
 			// strings only when a translation for that locale is loaded: a locale without one (e.g. fr_FR, de_AT, de_CH) gets
 			// English sentences with localized day names.

@@ -17,7 +17,10 @@
 	 */
 	var STORAGE = window.LCFF_STORAGE = {
 		local: ['lcff_token', 'lcff_seen', 'lcff_ask', 'lcff_acct'],
-		session: ['lcff_page']
+		session: ['lcff_page'],
+		// Sub-sites of a multisite network share an origin: each keeps its own keys.
+		suffix: typeof cfg.storageSuffix === 'string' ? cfg.storageSuffix : '',
+		name: function (key) { return key + STORAGE.suffix; }
 	};
 
 	var strings = cfg.strings || {};
@@ -33,7 +36,7 @@
 
 	function storedToken() {
 		try {
-			return window.localStorage.getItem('lcff_token');
+			return window.localStorage.getItem(STORAGE.name('lcff_token'));
 		} catch (e) {
 			return null;
 		}
@@ -96,12 +99,12 @@
 		var k;
 		for (k = 0; k < STORAGE.local.length; k++) {
 			try {
-				window.localStorage.removeItem(STORAGE.local[k]);
+				window.localStorage.removeItem(STORAGE.name(STORAGE.local[k]));
 			} catch (e2) {}
 		}
 		for (k = 0; k < STORAGE.session.length; k++) {
 			try {
-				window.sessionStorage.removeItem(STORAGE.session[k]);
+				window.sessionStorage.removeItem(STORAGE.name(STORAGE.session[k]));
 			} catch (e3) {}
 		}
 		expireLogoutSignal();
