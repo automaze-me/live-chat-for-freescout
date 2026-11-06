@@ -12,15 +12,16 @@ $GLOBALS['lcff_filters']  = array();
 $GLOBALS['lcff_actions']  = array();
 $GLOBALS['lcff_cookies']  = array();
 $GLOBALS['lcff_policies'] = array();
+$GLOBALS['lcff_url']      = 'https://help.example.test:8443/sub';
 function add_filter( $hook, $cb, $priority = 10, $args = 1 ) { $GLOBALS['lcff_filters'][ $hook ] = $cb; }
-function add_action( $hook, $cb, $priority = 10, $args = 1 ) { $GLOBALS['lcff_actions'][ $hook ][] = $cb; }
+function add_action( $hook, $cb, $priority = 10, $args = 1 ) { $GLOBALS['lcff_actions'][ $hook ][] = $cb; $GLOBALS['lcff_priorities'][ $hook ][ serialize( $cb ) ] = $priority; }
 function plugin_basename( $file ) { return basename( dirname( $file ) ) . '/' . basename( $file ); }
 function __return_true() { return true; }
 function __( $text, $domain = null ) { return $text; }
 function esc_html( $text ) { return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' ); }
 function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 function get_option( $name, $default = false ) {
-	return array( 'freescout_url' => 'https://help.example.test:8443/sub', 'site_id' => str_repeat( 'ab', 16 ) );
+	return array( 'freescout_url' => $GLOBALS['lcff_url'], 'site_id' => str_repeat( 'ab', 16 ) );
 }
 
 $ok = true;
@@ -48,7 +49,8 @@ require __DIR__ . '/../includes/class-lcff-privacy.php';
 /* ---- init ---- */
 
 LCFF_Privacy::init();
-t( 'register_consent runs on plugins_loaded', isset( $GLOBALS['lcff_actions']['plugins_loaded'] ) && in_array( array( 'LCFF_Privacy', 'register_consent' ), $GLOBALS['lcff_actions']['plugins_loaded'], true ), true );
+t( 'register_consent runs on init, after the text domain loads', $GLOBALS['lcff_priorities']['init'][ serialize( array( 'LCFF_Privacy', 'register_consent' ) ) ] ?? null, 11 );
+t( 'register_consent is no longer on plugins_loaded', isset( $GLOBALS['lcff_actions']['plugins_loaded'] ), false );
 t( 'add_policy runs on admin_init', isset( $GLOBALS['lcff_actions']['admin_init'] ) && in_array( array( 'LCFF_Privacy', 'add_policy' ), $GLOBALS['lcff_actions']['admin_init'], true ), true );
 
 /* ---- consent registration ---- */
@@ -102,6 +104,16 @@ t(
 	false !== strpos( html_entity_decode( $text, ENT_QUOTES, 'UTF-8' ), "The chat stores nothing in your browser until you use it: you send a message, you continue a conversation from an email link, or, if you are logged in and your account already has conversations, you open the chat. Then it keeps a random chat token and a few small settings in your browser's storage" ),
 	true
 );
+
+// Without a usable URL the sentence names no host.
+$GLOBALS['lcff_url'] = '';
+$bare = LCFF_Privacy::policy_text();
+t( 'no URL: policy has no dangling "at ."', false === strpos( $bare, ' at .' ), true );
+t( 'no URL: sentence ends at "help desk."', false !== strpos( $bare, 'go to our help desk. So does' ), true );
+$GLOBALS['lcff_url'] = 'https://help.example.com';
+$full = LCFF_Privacy::policy_text();
+t( 'with URL: names the host', false !== strpos( $full, 'at help.example.com. So does' ), true );
+$GLOBALS['lcff_url'] = 'https://help.example.test:8443/sub';
 
 /* ---- add_policy ---- */
 

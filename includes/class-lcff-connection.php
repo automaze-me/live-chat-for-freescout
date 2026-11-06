@@ -34,7 +34,7 @@ class LCFF_Connection {
 	 */
 	public static function handle_ajax() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( array( 'message' => '' ), 403 );
+			wp_send_json_error( array( 'message' => __( 'You are not allowed to test the connection.', 'live-chat-for-freescout' ) ), 403 );
 		}
 		if ( ! check_ajax_referer( self::NONCE, 'nonce', false ) ) {
 			wp_send_json_error( array( 'message' => __( 'Your session has expired. Reload the page and try again.', 'live-chat-for-freescout' ) ), 403 );

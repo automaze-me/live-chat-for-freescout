@@ -69,6 +69,7 @@ $GLOBALS['lcff_can']      = false;
 $r = run();
 t( 'no manage_options: 403', $r[0], 403 );
 t( 'no manage_options: no ok', isset( $r[1]['ok'] ), false );
+t( 'no manage_options: capability refusal text', $r[1], array( 'success' => false, 'data' => array( 'message' => 'You are not allowed to test the connection.' ) ) );
 
 $GLOBALS['lcff_can'] = true;
 $r = run();

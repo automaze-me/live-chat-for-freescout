@@ -69,6 +69,7 @@ foreach ( array( 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturd
 	t( "$day: open, opening and closing time labels", false !== strpos( $hours, "$day: open" ) && false !== strpos( $hours, "$day: opening time" ) && false !== strpos( $hours, "$day: closing time" ) );
 }
 t( 'day text is screen-reader text', false !== strpos( $hours, '<span class="screen-reader-text">Monday: opening time</span>' ) );
+t( 'hours hint: 00:00 to 00:00 is the whole day', false !== strpos( $hours, '<p class="description">From 00:00 to 00:00 counts as the whole day.</p>' ) );
 t( 'hours field has no style attribute', false === strpos( $hours, 'style=' ) );
 
 foreach ( array( 'avatar', 'accent', 'position', 'textarea', 'text' ) as $type ) {

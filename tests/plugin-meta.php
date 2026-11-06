@@ -56,6 +56,7 @@ if ( preg_match( '/^=== .+ ===\n(?:[A-Za-z ]+:.*\n)+\n(.+?)\n\n/s', $readme, $m 
 t( 'short description exists', '' !== $short, true );
 t( 'short description is at most 150 characters', preg_match_all( '/./su', $short ) <= 150, true );
 t( 'readme names the module repo', false !== strpos( $readme, 'https://github.com/automaze-me/freescout-wordpresschat' ), true );
+t( 'readme has a Privacy section heading', 1 === preg_match( '/^== Privacy ==$/m', $readme ), true );
 t( 'readme points to the Privacy section', false !== strpos( $readme, 'Privacy' ), true );
 t( 'no RhinoBag reference', preg_match( '/rhinobag/i', $readme . $main ), 0 );
 

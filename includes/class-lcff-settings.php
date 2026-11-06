@@ -308,6 +308,7 @@ class LCFF_Settings {
 			);
 			echo '</p>';
 		}
+		echo '<p class="description">' . esc_html__( 'From 00:00 to 00:00 counts as the whole day.', 'live-chat-for-freescout' ) . '</p>';
 		$tz = function_exists( 'wp_timezone_string' ) ? wp_timezone_string() : '';
 		/* translators: %s: the site's timezone, e.g. Europe/Berlin or +02:00 */
 		echo '<p class="description">' . esc_html( sprintf( __( "Times use the site's timezone (%s).", 'live-chat-for-freescout' ), $tz ) ) . '</p>';
