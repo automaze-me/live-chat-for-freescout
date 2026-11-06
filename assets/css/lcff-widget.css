@@ -381,34 +381,86 @@
 
 #lcff-root .lcff-form {
 	display: flex;
-	gap: 8px;
 	padding: 10px;
 	border-top: 1px solid #dcdcde;
 	background: #fff;
 	margin: 0;
 }
 
-#lcff-root .lcff-input {
+/* One box, as in other chat widgets: the text, then the paperclip and send at its end. */
+#lcff-root .lcff-composer {
 	flex: 1;
-	resize: none;
-	height: 40px;
-	padding: 9px 10px;
+	min-width: 0;
+	display: flex;
+	align-items: flex-end;
+	gap: 2px;
+	padding: 3px;
 	border: 1px solid #8c8f94;
-	border-radius: 8px;
-	font: inherit;
-	color: #1d2327;
+	border-radius: 10px;
 	background: #fff;
 }
 
+/* Focus: the box's own border turns 2 px wide in the accent colour (inset shadow, so nothing moves). */
+#lcff-root .lcff-composer.lcff-composer--focus {
+	border-color: var(--lcff-accent);
+	box-shadow: inset 0 0 0 1px var(--lcff-accent);
+}
+
+/* Forced colours drop box shadows: a system-colour outline marks the focus instead. */
+@media (forced-colors: active) {
+	#lcff-root .lcff-composer.lcff-composer--focus {
+		outline: 2px solid Highlight;
+		outline-offset: 1px;
+	}
+}
+
+/* One line high; fitInput() grows it with the text up to five lines, then it scrolls. */
+#lcff-root .lcff-input {
+	flex: 1;
+	min-width: 0;
+	resize: none;
+	height: 34px;
+	max-height: 114px;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	margin: 0;
+	padding: 7px 6px 7px 8px;
+	border: 0;
+	border-radius: 6px;
+	box-shadow: none;
+	outline: none;
+	font: inherit;
+	line-height: 20px;
+	color: #1d2327;
+	background: transparent;
+}
+
 #lcff-root .lcff-send {
+	flex: none;
+	width: 34px;
+	height: 34px;
+	margin: 0;
+	padding: 0;
 	border: 0;
 	border-radius: 8px;
-	padding: 0 16px;
 	background: var(--lcff-accent);
 	color: #fff;
-	font: inherit;
-	font-weight: 600;
 	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+#lcff-root .lcff-send svg {
+	width: 18px;
+	height: 18px;
+}
+
+/* The paper plane's own presentation attributes (sendIcon()), restated against a theme's `svg path` rule. */
+#lcff-root .lcff-send svg path {
+	fill: currentColor;
+	stroke: none;
+	stroke-width: 0;
 }
 
 #lcff-root .lcff-send:disabled {
@@ -418,8 +470,7 @@
 
 #lcff-root .lcff-bubble:focus-visible,
 #lcff-root .lcff-send:focus-visible,
-#lcff-root .lcff-close:focus-visible,
-#lcff-root .lcff-input:focus-visible {
+#lcff-root .lcff-close:focus-visible {
 	outline: 2px solid #2271b1;
 	outline-offset: 2px;
 }
@@ -464,17 +515,22 @@
 
 #lcff-root .lcff-attach {
 	flex: none;
-	width: 40px;
-	height: 40px;
+	width: 34px;
+	height: 34px;
+	margin: 0;
 	padding: 0;
-	border: 1px solid #8c8f94;
+	border: 0;
 	border-radius: 8px;
-	background: #fff;
+	background: transparent;
 	color: #50575e;
 	cursor: pointer;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+}
+
+#lcff-root .lcff-attach:hover:not(:disabled) {
+	background: #f0f0f1;
 }
 
 #lcff-root .lcff-attach svg {

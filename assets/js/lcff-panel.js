@@ -461,8 +461,15 @@
 				submit();
 			}
 		});
-		el.send = mk('button', 'lcff-send', str('send'));
+		el.input.addEventListener('input', fitInput);
+		// The focus ring goes round the whole box (text, paperclip and send), not the text area alone.
+		el.input.addEventListener('focus', function () { el.composer.classList.add('lcff-composer--focus'); });
+		el.input.addEventListener('blur', function () { el.composer.classList.remove('lcff-composer--focus'); });
+		el.send = mk('button', 'lcff-send');
 		el.send.type = 'submit';
+		el.send.setAttribute('aria-label', str('send'));
+		el.send.title = str('send');
+		el.send.appendChild(sendIcon());
 		el.attach = mk('button', 'lcff-attach');
 		el.attach.type = 'button';
 		el.attach.setAttribute('aria-label', str('attach'));
@@ -505,10 +512,13 @@
 		el.hp.addEventListener('blur', function () { el.hp.readOnly = true; });
 		el.hpWrap.appendChild(el.hp);
 		el.form.appendChild(el.hpWrap);
-		el.form.appendChild(el.attach);
 		el.form.appendChild(el.file);
-		el.form.appendChild(el.input);
-		el.form.appendChild(el.send);
+		// One box: the text, then the paperclip and send at its end.
+		el.composer = mk('div', 'lcff-composer');
+		el.composer.appendChild(el.input);
+		el.composer.appendChild(el.attach);
+		el.composer.appendChild(el.send);
+		el.form.appendChild(el.composer);
 		el.form.addEventListener('submit', function (e) {
 			e.preventDefault();
 			submit();
@@ -601,6 +611,22 @@
 		path.setAttribute('stroke-width', '2');
 		path.setAttribute('stroke-linecap', 'round');
 		path.setAttribute('stroke-linejoin', 'round');
+		svg.appendChild(path);
+		return svg;
+	}
+
+	/* The paper plane on the send button. Its label is the button's aria-label. */
+	function sendIcon() {
+		var ns = 'http://www.w3.org/2000/svg';
+		var svg = document.createElementNS(ns, 'svg');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('width', '18');
+		svg.setAttribute('height', '18');
+		svg.setAttribute('aria-hidden', 'true');
+		svg.setAttribute('focusable', 'false');
+		var path = document.createElementNS(ns, 'path');
+		path.setAttribute('d', 'M3.4 20.4l17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.99.99 0 0 0-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z');
+		path.setAttribute('fill', 'currentColor');
 		svg.appendChild(path);
 		return svg;
 	}
@@ -810,10 +836,23 @@
 		if (!text) { return; }
 		if (text.length > 5000) { text = text.slice(0, 5000); }
 		el.input.value = '';
+		fitInput();
 		var clientId = uuid();
 		var node = addPending(text, clientId);
 		enqueue({ node: node, text: text, clientId: clientId });
 		el.input.focus();
+	}
+
+	/*
+	 * The message box grows with its text, up to the CSS max-height (five
+	 * lines), and scrolls beyond that. A hidden box measures 0, so it is left
+	 * as it is; open() and the composer's return fit it again.
+	 */
+	function fitInput() {
+		if (!el.input || !el.input.offsetParent) { return; }
+		el.input.style.height = '';
+		var h = el.input.scrollHeight;
+		if (h > el.input.clientHeight) { el.input.style.height = h + 'px'; }
 	}
 
 	/* The file error stays until the next file action (a pick, a download) or until the panel closes. */
@@ -846,6 +885,7 @@
 		var text = el.input.value.trim();
 		if (text.length > 5000) { text = text.slice(0, 5000); }
 		el.input.value = '';
+		fitInput();
 		var clientId = uuid();
 		var node = addPending(text, clientId, file);
 		enqueue({ node: node, text: text, clientId: clientId, file: file });
@@ -1526,6 +1566,7 @@
 		el.list.removeAttribute('aria-live'); // the next session's history is not news either
 		showFileError('');
 		el.input.value = ''; // a draft belongs to whoever typed it
+		fitInput();
 		var kids = Array.prototype.slice.call(el.list.childNodes);
 		for (var i = 0; i < kids.length; i++) {
 			if (kids[i] !== el.welcome) { el.list.removeChild(kids[i]); }
@@ -1840,7 +1881,7 @@
 		var wasAway = !!askCard && askCard.className.indexOf('lcff-ask-away') !== -1;
 		if (askCard && askCard.parentNode) { askCard.parentNode.removeChild(askCard); }
 		askCard = null;
-		if (built && el.form) { el.form.hidden = false; } // the message box is back
+		if (built && el.form) { el.form.hidden = false; fitInput(); } // the message box is back
 		if (wasAway && isOpen && el.input) { el.input.focus(); } // the focused button is gone
 	}
 
@@ -2239,6 +2280,7 @@
 		checkIdentity();
 		armRecheck();
 		armHours();
+		fitInput();
 		scrollDown();
 		if (!held) { focusComposer(); } // else releaseList() focuses it
 	}
