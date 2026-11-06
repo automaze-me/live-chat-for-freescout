@@ -426,7 +426,9 @@
 			whenShown(showAvatar);
 		}
 		var names = mk('div', 'lcff-names');
-		names.appendChild(mk('div', 'lcff-title', teamName));
+		var title = mk('div', 'lcff-title', teamName);
+		title.setAttribute('dir', 'auto');
+		names.appendChild(title);
 		el.status = mk('div', 'lcff-status');
 		el.status.hidden = true;
 		names.appendChild(el.status);
@@ -442,6 +444,7 @@
 		// aria-live comes after the first render (handleMessages()): the history is not news.
 		el.list = mk('div', 'lcff-messages');
 		el.welcome = mk('div', 'lcff-welcome', cfg.welcome || str('welcome'));
+		el.welcome.setAttribute('dir', 'auto');
 		el.list.appendChild(el.welcome);
 		el.panel.appendChild(el.list);
 

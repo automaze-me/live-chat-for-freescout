@@ -116,7 +116,7 @@ Nothing is stored until a visitor uses the chat: sends a message, continues a co
 * `sessionStorage` `lcff_page`: a per-tab setting for the page address feature, deleted when the tab closes.
 * Cookie `lcff_logout` (10 minutes): set by your WordPress site when a user logs out, so the chat closes the conversation in that browser. It is not tracking, and it is not set for anyone else.
 
-On a multisite network, every site but the main site adds `_` and its site ID to these key names, so sites that share a domain keep separate chats.
+On a multisite network, every site but the main site adds `_` and its site ID to the storage key names (the `lcff_logout` cookie keeps its name), so sites that share a domain keep separate chats.
 
 The chat registers itself with the WP Consent API as functional, so consent plugins can list the cookie. Because nothing is stored before a visitor chooses to use the chat, the plugin does not show a consent banner of its own.
 

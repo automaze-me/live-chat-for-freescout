@@ -26,6 +26,12 @@
 	all: revert;
 }
 
+/* The root is left-to-right; text with dir="auto" (a message, the welcome) aligns to the side it runs from. */
+#lcff-root .lcff-text,
+#lcff-root .lcff-welcome {
+	text-align: start;
+}
+
 /* Generated content a theme adds to divs, buttons and the like (`button::after`) stays out. */
 #lcff-root :where(div, span, form, label, button, input, textarea, a, img, svg)::before,
 #lcff-root :where(div, span, form, label, button, input, textarea, a, img, svg)::after {

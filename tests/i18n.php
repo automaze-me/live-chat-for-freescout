@@ -19,7 +19,7 @@ $GLOBALS['lcff_actions']  = array();
 $GLOBALS['lcff_td_calls'] = array();
 $GLOBALS['lcff_inline']   = array();
 $GLOBALS['lcff_locale']   = 'en_US';
-function add_action( $hook, $cb, $priority = 10, $args = 1 ) { $GLOBALS['lcff_actions'][ $hook ][] = $cb; }
+function add_action( $hook, $cb, $priority = 10, $args = 1 ) { $GLOBALS['lcff_actions'][ $hook ][] = $cb; $GLOBALS['lcff_priorities'][ $hook ][] = array( $cb, $priority ); }
 function add_filter( $hook, $cb, $priority = 10, $args = 1 ) {}
 function plugin_dir_path( $file ) { return dirname( $file ) . '/'; }
 function plugin_dir_url( $file ) { return 'https://shop.example.test/wp-content/plugins/' . basename( dirname( $file ) ) . '/'; }
@@ -325,6 +325,12 @@ t(
 	$GLOBALS['lcff_td_calls'],
 	array( array( LCFF_TEST_DOMAIN, false, basename( $root ) . '/languages' ) )
 );
+$prio = array();
+foreach ( isset( $GLOBALS['lcff_priorities']['init'] ) ? $GLOBALS['lcff_priorities']['init'] : array() as $row ) {
+	$prio[ is_array( $row[0] ) ? $row[0][1] : $row[0] ] = $row[1];
+}
+t( 'lcff_load_textdomain runs on init before priority 11', isset( $prio['lcff_load_textdomain'] ) && $prio['lcff_load_textdomain'] < 11, true );
+t( 'the cookie description registers on init at 11, after the text domain', isset( $prio['register_cookie_info'] ) ? $prio['register_cookie_info'] : null, 11 );
 foreach ( array( 'plugins_loaded', 'after_setup_theme', 'setup_theme' ) as $early ) {
 	$GLOBALS['lcff_td_calls'] = array();
 	foreach ( isset( $GLOBALS['lcff_actions'][ $early ] ) ? $GLOBALS['lcff_actions'][ $early ] : array() as $cb ) {

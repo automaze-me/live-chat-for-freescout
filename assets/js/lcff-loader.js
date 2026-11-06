@@ -85,6 +85,19 @@
 	 * It runs before the panel is loaded, so it clears the STORAGE keys
 	 * itself (as the panel's dropSession() does).
 	 */
+	/* Removes every key of the storage that matches. */
+	function sweep(areaName, re) {
+		try {
+			var area = window[areaName]; // may throw: storage blocked
+			var names = [];
+			var i;
+			for (i = 0; i < area.length; i++) {
+				if (re.test(area.key(i))) { names.push(area.key(i)); }
+			}
+			for (i = 0; i < names.length; i++) { area.removeItem(names[i]); }
+		} catch (e) {}
+	}
+
 	function forgetAfterLogout() {
 		var t = storedToken();
 		if (t) {
@@ -96,17 +109,11 @@
 				}).then(null, function () {});
 			} catch (e) {}
 		}
-		var k;
-		for (k = 0; k < STORAGE.local.length; k++) {
-			try {
-				window.localStorage.removeItem(STORAGE.name(STORAGE.local[k]));
-			} catch (e2) {}
-		}
-		for (k = 0; k < STORAGE.session.length; k++) {
-			try {
-				window.sessionStorage.removeItem(STORAGE.name(STORAGE.session[k]));
-			} catch (e3) {}
-		}
+		/* A WordPress logout covers every site of a network, and the sites share
+		 * this origin's storage: drop the widget keys of all of them (every
+		 * suffix), not only this site's. Only this site's token was POSTed above. */
+		sweep('localStorage', /^lcff_(token|seen|ask|acct)(_\d+)?$/);
+		sweep('sessionStorage', /^lcff_page(_\d+)?$/);
 		expireLogoutSignal();
 	}
 
@@ -213,9 +220,15 @@
 		}).then(function () {
 			/* A script that loads without defining the panel (an optimiser that
 			 * wraps or defers it) is a failed load too. */
-			if (!window.LCFF) {
-				throw new Error('lcff panel script loaded but did not start');
+			if (window.LCFF) {
+				return undefined;
 			}
+			/* A wrapper may start the panel a tick later: look once more before giving up. */
+			return new Promise(function (resolve, reject) {
+				window.setTimeout(function () {
+					if (window.LCFF) { resolve(); } else { reject(new Error('lcff panel script loaded but did not start')); }
+				}, 300);
+			});
 		}).then(null, function (err) {
 			loading = null;
 			throw err;
