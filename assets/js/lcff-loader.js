@@ -126,6 +126,14 @@
 	if (/^#[0-9a-f]{6}$/i.test(cfg.accent || '')) {
 		bubble.style.setProperty('--lcff-accent', cfg.accent);
 	}
+	// The button's own color (the accent unless one is set) and an icon color that reads on it.
+	if (/^#[0-9a-f]{6}$/i.test(cfg.buttonColor || '') && /^#[0-9a-f]{6}$/i.test(cfg.buttonIcon || '')) {
+		bubble.style.setProperty('--lcff-button', cfg.buttonColor);
+		bubble.style.setProperty('--lcff-button-icon', cfg.buttonIcon);
+	}
+	if (cfg.buttonRing === true) {
+		bubble.classList.add('lcff-bubble--ring');
+	}
 	if (cfg.position === 'left') {
 		bubble.classList.add('lcff-left');
 	}

@@ -84,6 +84,8 @@ $form    = array(
 	'team_name'     => 'Shop \ Team',
 	'avatar_id'     => '12',
 	'accent'        => '#AA3311',
+	'button_color'  => '#BA3B46',
+	'button_ring'   => '1',
 	'position'      => 'left',
 	'welcome'       => $welcome,
 	'welcome_away'  => "Away.\nBack soon \\ promise",
@@ -112,6 +114,11 @@ t( 'first save keeps a backslash in the away text', $saved['welcome_away'], "Awa
 t( 'first save keeps a backslash in the team name', $saved['team_name'], 'Shop \ Team' );
 t( 'first save stores the secret', $saved['secret'], $secret );
 t( 'first save, the rest', array( $saved['freescout_url'], $saved['site_id'], $saved['avatar_id'], $saved['accent'], $saved['position'], $saved['hidden_paths'], $saved['privacy_url'] ), array( 'https://support.example.test', '0123456789abcdef0123456789abcdef', 12, '#aa3311', 'left', "/checkout/\n/account/*", 'https://shop.example.test/privacy/' ) );
+
+t( 'first save keeps the button color and the ring', array( $saved['button_color'], $saved['button_ring'] ), array( '#ba3b46', true ) );
+$GLOBALS['lcff_test_option'] = $saved;
+$off = wp_save_from_form( array_merge( $form, array( 'button_color' => '', 'button_ring' => '0' ) ) );
+t( 'an unchecked ring and an empty button color are saved', array( $off['button_color'], $off['button_ring'] ), array( '', false ) );
 
 // 2. sanitize(sanitize($form)) === sanitize($form), with a saved secret and the field left blank.
 $GLOBALS['lcff_test_option'] = array( 'secret' => $secret, 'site_id' => '0123456789abcdef0123456789abcdef' );

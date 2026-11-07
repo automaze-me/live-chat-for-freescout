@@ -37,8 +37,16 @@ class LCFF_Appearance {
 			$out['avatar_id'] = is_array( $input['avatar_id'] ) ? 0 : absint( $input['avatar_id'] );
 		}
 		if ( isset( $input['accent'] ) ) {
-			$accent         = strtolower( trim( sanitize_text_field( self::str( $input['accent'] ) ) ) );
-			$out['accent'] = 1 === preg_match( '/^#[0-9a-f]{6}$/', $accent ) ? $accent : self::DEFAULT_ACCENT;
+			$accent        = strtolower( trim( sanitize_text_field( self::str( $input['accent'] ) ) ) );
+			$out['accent'] = self::is_hex( $accent ) ? $accent : self::DEFAULT_ACCENT;
+		}
+		if ( isset( $input['button_color'] ) ) {
+			$color               = strtolower( trim( sanitize_text_field( self::str( $input['button_color'] ) ) ) );
+			$out['button_color'] = self::is_hex( $color ) ? $color : '';
+		}
+		if ( isset( $input['button_ring'] ) ) {
+			// The form posts "0" (a hidden field) or "1" (the checkbox); a second pass gets the boolean.
+			$out['button_ring'] = '1' === self::str( $input['button_ring'] );
 		}
 		if ( isset( $input['position'] ) ) {
 			$out['position'] = 'left' === self::str( $input['position'] ) ? 'left' : 'right';
@@ -122,6 +130,42 @@ class LCFF_Appearance {
 	}
 
 	/**
+	 * The icon color for a button in $hex: white or dark, whichever contrasts
+	 * more (WCAG relative luminance). Anything but #rrggbb gets white.
+	 *
+	 * @param string $hex Button color.
+	 * @return string
+	 */
+	public static function icon_color( $hex ) {
+		$dark = '#1d2327';
+		if ( ! self::is_hex( $hex ) ) {
+			return '#ffffff';
+		}
+		$l = self::luminance( $hex );
+		return ( 1.05 / ( $l + 0.05 ) ) >= ( ( $l + 0.05 ) / ( self::luminance( $dark ) + 0.05 ) ) ? '#ffffff' : $dark;
+	}
+
+	/**
+	 * WCAG relative luminance of a #rrggbb color, 0 (black) to 1 (white).
+	 */
+	private static function luminance( $hex ) {
+		$l = 0.0;
+		foreach ( array( 0.2126, 0.7152, 0.0722 ) as $i => $weight ) {
+			$c  = hexdec( substr( $hex, 1 + 2 * $i, 2 ) ) / 255;
+			$c  = $c <= 0.04045 ? $c / 12.92 : pow( ( $c + 0.055 ) / 1.055, 2.4 );
+			$l += $weight * $c;
+		}
+		return $l;
+	}
+
+	/**
+	 * True for a lowercase #rrggbb color.
+	 */
+	private static function is_hex( $v ) {
+		return is_string( $v ) && 1 === preg_match( '/^#[0-9a-f]{6}$/', $v );
+	}
+
+	/**
 	 * The appearance part of LCFF_CONFIG. Empty values fall back to defaults.
 	 *
 	 * @param array $s Stored settings.
@@ -134,9 +178,15 @@ class LCFF_Appearance {
 			$avatar = $url ? (string) $url : '';
 		}
 		$privacy = ! empty( $s['privacy_url'] ) ? (string) $s['privacy_url'] : (string) get_privacy_policy_url();
+		$accent  = ! empty( $s['accent'] ) ? $s['accent'] : self::DEFAULT_ACCENT;
+		// The chat button has its own color when one is set, else the accent.
+		$button = ( isset( $s['button_color'] ) && self::is_hex( $s['button_color'] ) ) ? $s['button_color'] : $accent;
 
 		return array(
-			'accent'      => ! empty( $s['accent'] ) ? $s['accent'] : self::DEFAULT_ACCENT,
+			'accent'      => $accent,
+			'buttonColor' => $button,
+			'buttonIcon'  => self::icon_color( $button ),
+			'buttonRing'  => isset( $s['button_ring'] ) && true === $s['button_ring'],
 			'position'    => ( isset( $s['position'] ) && 'left' === $s['position'] ) ? 'left' : 'right',
 			'teamName'    => ! empty( $s['team_name'] ) ? self::decode( $s['team_name'] ) : __( 'Chat with us', 'live-chat-for-freescout' ),
 			'avatarUrl'   => $avatar,

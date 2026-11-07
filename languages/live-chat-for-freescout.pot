@@ -138,6 +138,26 @@ msgstr ""
 msgid "Accent color"
 msgstr ""
 
+#: includes/class-lcff-settings.php:237
+msgid "Button color"
+msgstr ""
+
+#: includes/class-lcff-settings.php:237
+msgid "The color of the round chat button. Leave empty to use the accent color."
+msgstr ""
+
+#: includes/class-lcff-settings.php:238
+msgid "Button ring"
+msgstr ""
+
+#: includes/class-lcff-settings.php:238
+msgid "Keeps the button visible where the page behind it has the same color."
+msgstr ""
+
+#: includes/class-lcff-settings.php:238
+msgid "Draw a white ring around the chat button"
+msgstr ""
+
 #: includes/class-lcff-settings.php:189
 msgid "Position"
 msgstr ""

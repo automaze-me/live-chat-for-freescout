@@ -85,13 +85,18 @@
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
-	background: var(--lcff-accent);
-	color: #fff;
+	background: var(--lcff-button, var(--lcff-accent));
+	color: var(--lcff-button-icon, #fff);
 	cursor: pointer;
 	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+/* Settings → Button ring: keeps the button visible on a background of its own color. */
+#lcff-root .lcff-bubble.lcff-bubble--ring {
+	box-shadow: 0 0 0 2px #fff, 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 #lcff-root .lcff-bubble:hover,
@@ -102,6 +107,7 @@
 /* The panel failed to load (the loader's label says so); a tap tries again. */
 #lcff-root .lcff-bubble.lcff-bubble--error {
 	background: #d63638;
+	color: #fff;
 }
 
 #lcff-root .lcff-bubble-icon {
@@ -123,6 +129,8 @@
 	border-radius: 10px;
 	background: #d63638;
 	color: #fff;
+	/* The white edge keeps the count apart from a button in a similar color. */
+	box-shadow: 0 0 0 2px #fff;
 	font-size: 12px;
 	font-weight: 600;
 	line-height: 20px;

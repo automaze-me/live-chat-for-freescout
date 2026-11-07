@@ -80,6 +80,27 @@ $GLOBALS['lcff_stored']['avatar_id'] = 0;
 $o = out( array( 'LCFF_Settings', 'render_appearance_field' ), array( array( 'key' => 'avatar_id', 'type' => 'avatar', 'description' => '' ) ) );
 t( 'empty avatar has no style attribute', false === strpos( $o, 'style=' ) && false !== strpos( $o, 'lcff-hidden' ) );
 
+// The button color: a color picker whose "Clear" empties it (no default color).
+$GLOBALS['lcff_stored']['button_color'] = '#ba3b46';
+$o = out( array( 'LCFF_Settings', 'render_appearance_field' ), array( array( 'key' => 'button_color', 'type' => 'color', 'description' => 'd' ) ) );
+t( 'button color: a color field with the stored value', false !== strpos( $o, 'name="lcff_settings[button_color]" value="#ba3b46" class="lcff-color-field"' ) );
+t( 'button color: no default color', false !== strpos( $o, 'data-default-color=""' ) );
+t( 'button color has no style attribute', false === strpos( $o, 'style=' ) );
+// The ring: a hidden 0 before the checkbox, so an unchecked box saves "off".
+$ring = array( array( 'key' => 'button_ring', 'type' => 'checkbox', 'description' => 'd', 'label' => 'Draw a white ring' ) );
+$GLOBALS['lcff_stored']['button_ring'] = true;
+$o = out( array( 'LCFF_Settings', 'render_appearance_field' ), $ring );
+t( 'ring: hidden 0 before the checkbox', 1 === preg_match( '/<input type="hidden" name="lcff_settings\[button_ring\]" value="0" \/>.*<input type="checkbox" id="lcff_button_ring" name="lcff_settings\[button_ring\]" value="1"/s', $o ) );
+t( 'ring: checked when on', false !== strpos( $o, "checked='checked'" ) );
+t( 'ring: the checkbox has its label', false !== strpos( $o, 'Draw a white ring</label>' ) );
+t( 'ring has no style attribute', false === strpos( $o, 'style=' ) );
+$GLOBALS['lcff_stored']['button_ring'] = false;
+$o = out( array( 'LCFF_Settings', 'render_appearance_field' ), $ring );
+t( 'ring: not checked when off', false === strpos( $o, 'checked' ) );
+unset( $GLOBALS['lcff_stored']['button_ring'] );
+$o = out( array( 'LCFF_Settings', 'render_appearance_field' ), $ring );
+t( 'ring: not checked when never saved', false === strpos( $o, 'checked' ) );
+
 $page = out( array( 'LCFF_Settings', 'render_page' ) );
 t( 'page has the test button and result', false !== strpos( $page, 'id="lcff_test_connection"' ) && false !== strpos( $page, 'id="lcff_test_result"' ) );
 t( 'page has no style attribute', false === strpos( $page, 'style=' ) );

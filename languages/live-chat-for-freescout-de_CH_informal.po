@@ -139,6 +139,26 @@ msgstr "Avatar"
 msgid "Accent color"
 msgstr "Akzentfarbe"
 
+#: includes/class-lcff-settings.php:237
+msgid "Button color"
+msgstr "Button-Farbe"
+
+#: includes/class-lcff-settings.php:237
+msgid "The color of the round chat button. Leave empty to use the accent color."
+msgstr "Die Farbe des runden Chat-Buttons. Lass das Feld leer, um die Akzentfarbe zu verwenden."
+
+#: includes/class-lcff-settings.php:238
+msgid "Button ring"
+msgstr "Ring um den Button"
+
+#: includes/class-lcff-settings.php:238
+msgid "Keeps the button visible where the page behind it has the same color."
+msgstr "So bleibt der Button sichtbar, wo die Seite dahinter dieselbe Farbe hat."
+
+#: includes/class-lcff-settings.php:238
+msgid "Draw a white ring around the chat button"
+msgstr "Weissen Ring um den Chat-Button zeichnen"
+
 #: includes/class-lcff-settings.php:189
 msgid "Position"
 msgstr "Position"

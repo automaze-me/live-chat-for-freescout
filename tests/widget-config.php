@@ -108,5 +108,25 @@ function lcff_suffix_for( $multisite, $main ) {
 t( 'storageSuffix on a network sub-site (ID 7)', lcff_suffix_for( true, false ), '_7' );
 t( 'storageSuffix on the main site of a network', lcff_suffix_for( true, true ), '' );
 
+/** LCFF_CONFIG as an array, for these stored settings. */
+function lcff_config_for( array $settings ) {
+	$js = lcff_inline_for( $settings );
+	return 1 === preg_match( '/^window\.LCFF_CONFIG = (.*);$/s', $js, $m ) ? json_decode( $m[1], true ) : array();
+}
+
+// The chat button: its own color (empty means the accent), the white ring, the icon color.
+$c = lcff_config_for( array() );
+t( 'button: no settings, the default accent', array( $c['buttonColor'], $c['buttonRing'], $c['buttonIcon'] ), array( '#2f6f5e', false, '#ffffff' ) );
+$c = lcff_config_for( array( 'accent' => '#131a45', 'button_color' => '' ) );
+t( 'button: empty color, the accent', array( $c['buttonColor'], $c['accent'] ), array( '#131a45', '#131a45' ) );
+$c = lcff_config_for( array( 'accent' => '#131a45', 'button_color' => '#ba3b46', 'button_ring' => true ) );
+t( 'button: own color and ring, accent unchanged', array( $c['buttonColor'], $c['buttonRing'], $c['buttonIcon'], $c['accent'] ), array( '#ba3b46', true, '#ffffff', '#131a45' ) );
+$c = lcff_config_for( array( 'button_color' => '#f0c000' ) );
+t( 'button: a light color gets the dark icon', $c['buttonIcon'], '#1d2327' );
+$c = lcff_config_for( array( 'accent' => '#f0c000', 'button_color' => '' ) );
+t( 'button: a light accent gets the dark icon', array( $c['buttonColor'], $c['buttonIcon'] ), array( '#f0c000', '#1d2327' ) );
+$c = lcff_config_for( array( 'accent' => '#131a45', 'button_color' => 'red', 'button_ring' => 'yes' ) );
+t( 'button: a stored junk color falls back to the accent, junk ring is off', array( $c['buttonColor'], $c['buttonRing'] ), array( '#131a45', false ) );
+
 echo $ok ? "PASS\n" : "FAIL\n";
 exit( $ok ? 0 : 1 );

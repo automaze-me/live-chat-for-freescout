@@ -38,6 +38,29 @@ t( 'accent red', LCFF_Appearance::sanitize( array( 'accent' => 'red' ) )['accent
 t( 'accent bad hex', LCFF_Appearance::sanitize( array( 'accent' => '#12345g' ) )['accent'], '#2f6f5e' );
 t( 'accent ok, lowercased', LCFF_Appearance::sanitize( array( 'accent' => '#AABBCC' ) )['accent'], '#aabbcc' );
 t( 'accent 3-digit rejected', LCFF_Appearance::sanitize( array( 'accent' => '#abc' ) )['accent'], '#2f6f5e' );
+t( 'button color empty stays empty', LCFF_Appearance::sanitize( array( 'button_color' => '' ) )['button_color'], '' );
+t( 'button color ok, trimmed and lowercased', LCFF_Appearance::sanitize( array( 'button_color' => ' #BA3B46 ' ) )['button_color'], '#ba3b46' );
+t( 'button color name becomes empty', LCFF_Appearance::sanitize( array( 'button_color' => 'red' ) )['button_color'], '' );
+t( 'button color 3-digit becomes empty', LCFF_Appearance::sanitize( array( 'button_color' => '#abc' ) )['button_color'], '' );
+t( 'button color array becomes empty', LCFF_Appearance::sanitize( array( 'button_color' => array( '#aabbcc' ) ) )['button_color'], '' );
+t( 'button ring checked', LCFF_Appearance::sanitize( array( 'button_ring' => '1' ) )['button_ring'], true );
+t( 'button ring unchecked (the hidden 0)', LCFF_Appearance::sanitize( array( 'button_ring' => '0' ) )['button_ring'], false );
+t( 'button ring junk is off', LCFF_Appearance::sanitize( array( 'button_ring' => 'yes' ) )['button_ring'], false );
+t( 'button ring array is off', LCFF_Appearance::sanitize( array( 'button_ring' => array( '1' ) ) )['button_ring'], false );
+t( 'button ring survives a second pass', LCFF_Appearance::sanitize( LCFF_Appearance::sanitize( array( 'button_ring' => '1' ) ) )['button_ring'], true );
+t( 'button ring off survives a second pass', LCFF_Appearance::sanitize( LCFF_Appearance::sanitize( array( 'button_ring' => '0' ) ) )['button_ring'], false );
+
+// The icon takes whichever of white and dark text contrasts more with the button.
+t( 'icon on the default accent: white', LCFF_Appearance::icon_color( '#2f6f5e' ), '#ffffff' );
+t( 'icon on navy: white', LCFF_Appearance::icon_color( '#131a45' ), '#ffffff' );
+t( 'icon on red: white', LCFF_Appearance::icon_color( '#ba3b46' ), '#ffffff' );
+t( 'icon on mid grey: white', LCFF_Appearance::icon_color( '#777777' ), '#ffffff' );
+t( 'icon on black: white', LCFF_Appearance::icon_color( '#000000' ), '#ffffff' );
+t( 'icon on yellow: dark', LCFF_Appearance::icon_color( '#f0c000' ), '#1d2327' );
+t( 'icon on light grey: dark', LCFF_Appearance::icon_color( '#dddddd' ), '#1d2327' );
+t( 'icon on white: dark', LCFF_Appearance::icon_color( '#ffffff' ), '#1d2327' );
+t( 'icon for junk: white', LCFF_Appearance::icon_color( 'red' ), '#ffffff' );
+
 t( 'position left', LCFF_Appearance::sanitize( array( 'position' => 'left' ) )['position'], 'left' );
 t( 'position other', LCFF_Appearance::sanitize( array( 'position' => 'top' ) )['position'], 'right' );
 t( 'team name cut to 60', LCFF_Appearance::sanitize( array( 'team_name' => str_repeat( 'a', 80 ) ) )['team_name'], str_repeat( 'a', 60 ) );

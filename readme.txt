@@ -18,7 +18,7 @@ FreeScout is a free, self-hosted help desk. This plugin does not work on its own
 
 **What your visitors see**
 
-* A chat bubble in the bottom right or bottom left corner, in your accent color, with your team name and avatar.
+* A chat bubble in the bottom right or bottom left corner, in your accent color or a button color of its own, with your team name and avatar.
 * Your working hours. Outside them the chat shows your away message instead.
 * An email fallback. If nobody is online or the visitor leaves the page, they can leave an email address and your answer is sent there.
 * File attachments: images (JPEG, PNG, GIF, WebP) and PDF files.
@@ -27,7 +27,7 @@ FreeScout is a free, self-hosted help desk. This plugin does not work on its own
 **What you control**
 
 * The FreeScout address, site ID and secret.
-* Team name, avatar, accent color, position and welcome messages.
+* Team name, avatar, accent color, button color, position and welcome messages. A white ring around the button keeps it visible on a background of the same color.
 * Working hours for each day of the week.
 * Pages where the bubble stays hidden, such as the checkout.
 * Your privacy policy link, shown inside the chat.

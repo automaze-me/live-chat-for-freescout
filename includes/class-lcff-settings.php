@@ -45,6 +45,8 @@ class LCFF_Settings {
 				'team_name'     => '',
 				'avatar_id'     => 0,
 				'accent'        => LCFF_Appearance::DEFAULT_ACCENT,
+				'button_color'  => '',
+				'button_ring'   => false,
 				'position'      => 'right',
 				'welcome'       => '',
 				'welcome_away'  => '',
@@ -232,6 +234,8 @@ class LCFF_Settings {
 			array( 'team_name', __( 'Team name', 'live-chat-for-freescout' ), 'text', '' ),
 			array( 'avatar_id', __( 'Avatar', 'live-chat-for-freescout' ), 'avatar', '' ),
 			array( 'accent', __( 'Accent color', 'live-chat-for-freescout' ), 'accent', '' ),
+			array( 'button_color', __( 'Button color', 'live-chat-for-freescout' ), 'color', __( 'The color of the round chat button. Leave empty to use the accent color.', 'live-chat-for-freescout' ) ),
+			array( 'button_ring', __( 'Button ring', 'live-chat-for-freescout' ), 'checkbox', __( 'Keeps the button visible where the page behind it has the same color.', 'live-chat-for-freescout' ), __( 'Draw a white ring around the chat button', 'live-chat-for-freescout' ) ),
 			array( 'position', __( 'Position', 'live-chat-for-freescout' ), 'position', '' ),
 			array( 'welcome', __( 'Welcome message', 'live-chat-for-freescout' ), 'textarea', '' ),
 			array( 'welcome_away', __( 'Welcome message (away)', 'live-chat-for-freescout' ), 'textarea', '' ),
@@ -256,6 +260,7 @@ class LCFF_Settings {
 					'key'         => $f[0],
 					'type'        => $f[2],
 					'description' => $f[3],
+					'label'       => isset( $f[4] ) ? $f[4] : '',
 					'label_for'   => 'lcff_' . $f[0],
 				)
 			);
@@ -339,12 +344,25 @@ class LCFF_Settings {
 				echo '<button type="button" class="button-link' . ( $url ? '' : ' lcff-hidden' ) . '" id="lcff_avatar_remove">' . esc_html__( 'Remove', 'live-chat-for-freescout' ) . '</button>';
 				break;
 			case 'accent':
+			case 'color':
+				// The button color has no default: the picker's "Clear" empties it (the button then takes the accent).
 				printf(
 					'<input type="text" id="%1$s" name="%2$s" value="%3$s" class="lcff-color-field" data-default-color="%4$s" />',
 					esc_attr( $id ),
 					esc_attr( $name ),
 					esc_attr( $val ),
-					esc_attr( LCFF_Appearance::DEFAULT_ACCENT )
+					esc_attr( 'accent' === $args['type'] ? LCFF_Appearance::DEFAULT_ACCENT : '' )
+				);
+				break;
+			case 'checkbox':
+				// An unchecked box posts nothing: the hidden "0" before it saves "off".
+				printf( '<input type="hidden" name="%1$s" value="0" />', esc_attr( $name ) );
+				printf(
+					'<label for="%1$s"><input type="checkbox" id="%1$s" name="%2$s" value="1"%3$s /> %4$s</label>',
+					esc_attr( $id ),
+					esc_attr( $name ),
+					checked( true === $val, true, false ),
+					esc_html( isset( $args['label'] ) ? $args['label'] : '' )
 				);
 				break;
 			case 'position':
