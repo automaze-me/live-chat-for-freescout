@@ -4,3 +4,4 @@
 .gitignore export-ignore
 /.distignore export-ignore
 /tools export-ignore
+/README.md export-ignore

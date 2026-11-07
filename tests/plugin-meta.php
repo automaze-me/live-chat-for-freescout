@@ -40,6 +40,10 @@ t( 'Contributors', lcff_readme_field( $readme, 'Contributors' ), 'automazeme' );
 t( 'Tested up to', lcff_readme_field( $readme, 'Tested up to' ), '7.1' );
 t( 'Author', lcff_header_field( $main, 'Author' ), 'automaze.me' );
 t( 'Author URI', lcff_header_field( $main, 'Author URI' ), 'https://automaze.me' );
+// Updates come from GitHub releases (includes/class-lcff-updater.php): WordPress
+// then asks the update_plugins_github.com filter and never wordpress.org.
+t( 'Update URI', lcff_header_field( $main, 'Update URI' ), 'https://github.com/automaze-me/live-chat-for-freescout' );
+t( 'the updater is loaded and started', false !== strpos( $main, "includes/class-lcff-updater.php'" ) && false !== strpos( $main, 'LCFF_Updater::init();' ), true );
 t( 'License matches', lcff_readme_field( $readme, 'License' ), lcff_header_field( $main, 'License' ) );
 
 foreach ( array( 'Description', 'Installation', 'Frequently Asked Questions', 'Changelog' ) as $section ) {
@@ -61,11 +65,12 @@ t( 'readme points to the Privacy section', false !== strpos( $readme, 'Privacy' 
 t( 'no RhinoBag reference', preg_match( '/rhinobag/i', $readme . $main ), 0 );
 
 $dist = (string) @file_get_contents( $root . '/.distignore' );
-$want = array( '.git', '.github', '.gitattributes', '.gitignore', '.distignore', 'tests', 'tools', 'node_modules', '*.zip', '.DS_Store' );
+$want = array( '.git', '.github', '.gitattributes', '.gitignore', '.distignore', 'tests', 'tools', 'node_modules', '*.zip', '.DS_Store', 'README.md' );
 t( '.distignore lines', array_values( array_filter( array_map( 'trim', explode( "\n", $dist ) ) ) ), $want );
 $attr = (string) file_get_contents( $root . '/.gitattributes' );
 t( '.gitattributes ignores .distignore', 1 === preg_match( '#^(/)?\.distignore export-ignore$#m', $attr ), true );
 t( '.gitattributes ignores /tools', 1 === preg_match( '#^/tools export-ignore$#m', $attr ), true );
+t( '.gitattributes ignores /README.md (GitHub only; readme.txt is the plugin readme)', 1 === preg_match( '#^/README\.md export-ignore$#m', $attr ), true );
 
 echo $ok ? "PASS\n" : "FAIL\n";
 exit( $ok ? 0 : 1 );

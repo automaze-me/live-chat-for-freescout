@@ -1,0 +1,48 @@
+name: Release
+
+# On a version tag (e.g. v0.2.0): run the tests, build the install zip and
+# update.json, and publish a GitHub Release with both attached.
+# The zip holds a top-level live-chat-for-freescout/ folder, the layout
+# WordPress expects under Plugins > Add New > Upload Plugin. Installed copies
+# find new versions through releases/latest/download/update.json
+# (includes/class-lcff-updater.php) and download the zip from the release.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run the tests
+        run: |
+          for f in tests/*.php; do
+            php "$f" > /dev/null || { php "$f" | grep -v '^ok'; exit 1; }
+          done
+          node tests/hours.test.js > /dev/null
+
+      - name: Write update.json
+        # Fails unless the tag is "v" plus the plugin's Version, and LCFF_VERSION
+        # and readme.txt's Stable tag agree with it.
+        run: php tools/update-manifest.php "${GITHUB_REF_NAME}" > update.json
+
+      - name: Build plugin zip
+        # git archive honors export-ignore in .gitattributes (tests, tools,
+        # .github, README.md, ... stay out of the install zip).
+        run: git archive --format=zip --prefix=live-chat-for-freescout/ -o live-chat-for-freescout.zip HEAD
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" live-chat-for-freescout.zip update.json \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes

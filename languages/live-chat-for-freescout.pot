@@ -158,6 +158,10 @@ msgstr ""
 msgid "Draw a white ring around the chat button"
 msgstr ""
 
+#: includes/class-lcff-updater.php:94
+msgid "Release notes on GitHub"
+msgstr ""
+
 #: includes/class-lcff-settings.php:189
 msgid "Position"
 msgstr ""

@@ -1,7 +1,8 @@
 <?php
 /**
  * uninstall.php removes the settings and the rate-limit transients from every
- * site: once on a single site, once per site on a multisite network.
+ * site: once on a single site, once per site on a multisite network. The
+ * cached update manifest is network-wide and goes once.
  * Run: php tests/uninstall.php
  */
 
@@ -27,6 +28,10 @@ function switch_to_blog( $id ) {
 function restore_current_blog() {
 	$GLOBALS['current'] = array_pop( $GLOBALS['stack'] );
 	$GLOBALS['log'][]   = array( 'restore', $GLOBALS['current'] );
+}
+function delete_site_transient( $name ) {
+	$GLOBALS['log'][] = array( 'delete_site_transient', $GLOBALS['current'], $name );
+	return true;
 }
 function delete_option( $name ) {
 	$GLOBALS['log'][] = array( 'delete_option', $GLOBALS['current'], $name );
@@ -89,12 +94,14 @@ t( 'single: one delete_option', lcff_only( $log, 'delete_option' ), array( array
 $q = lcff_only( $log, 'query' );
 t( 'single: one transient query', count( $q ), 1 );
 t( 'single: the query names both LIKE patterns', isset( $q[0] ) && lcff_query_ok( $q[0][2] ), true );
+t( 'single: the update cache goes', lcff_only( $log, 'delete_site_transient' ), array( array( 'delete_site_transient', 1, 'lcff_update_manifest' ) ) );
 t( 'single: no site switching', array_merge( lcff_only( $log, 'switch' ), lcff_only( $log, 'restore' ), lcff_only( $log, 'get_sites' ) ), array() );
 
 // Three-site network.
 $GLOBALS['multisite'] = true;
 $GLOBALS['sites']     = array( 1, 2, 3 );
 $log                  = lcff_run_uninstall();
+t( 'network: the update cache goes once, outside the site loop', lcff_only( $log, 'delete_site_transient' ), array( array( 'delete_site_transient', 1, 'lcff_update_manifest' ) ) );
 t( 'network: get_sites asks for ids', lcff_only( $log, 'get_sites' ), array( array( 'get_sites', array( 'fields' => 'ids', 'number' => 0 ) ) ) );
 t( 'network: three switches', array_column( lcff_only( $log, 'switch' ), 1 ), array( 1, 2, 3 ) );
 t( 'network: every switch restored', count( lcff_only( $log, 'restore' ) ), 3 );
@@ -113,7 +120,7 @@ foreach ( $q as $row ) {
 t( 'network: every query names both LIKE patterns', $all, true );
 $seq = array();
 foreach ( $log as $r ) {
-	if ( 'get_sites' !== $r[0] ) {
+	if ( 'get_sites' !== $r[0] && 'delete_site_transient' !== $r[0] ) {
 		$seq[] = $r[0];
 	}
 }

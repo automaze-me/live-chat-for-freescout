@@ -8,3 +8,4 @@ tools
 node_modules
 *.zip
 .DS_Store
+README.md

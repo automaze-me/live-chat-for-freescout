@@ -159,6 +159,10 @@ msgstr "So bleibt der Button sichtbar, wo die Seite dahinter dieselbe Farbe hat.
 msgid "Draw a white ring around the chat button"
 msgstr "Weißen Ring um den Chat-Button zeichnen"
 
+#: includes/class-lcff-updater.php:94
+msgid "Release notes on GitHub"
+msgstr "Versionshinweise auf GitHub"
+
 #: includes/class-lcff-settings.php:189
 msgid "Position"
 msgstr "Position"

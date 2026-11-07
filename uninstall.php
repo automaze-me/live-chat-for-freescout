@@ -1,7 +1,8 @@
 <?php
 /**
  * Removes plugin data on uninstall: the settings and the rate-limit
- * transients, on every site of a multisite network.
+ * transients, on every site of a multisite network, and the network-wide
+ * cache of the latest release's update data.
  *
  * @package LiveChatForFreeScout
  */
@@ -22,6 +23,8 @@ $lcff_cleanup = function () {
 		)
 	);
 };
+
+delete_site_transient( 'lcff_update_manifest' );
 
 if ( is_multisite() ) {
 	foreach ( get_sites( array(
